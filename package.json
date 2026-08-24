@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "showcase:watch": "node scripts/showcase-watch.js",
     "test": "node --test"
   }
 }
