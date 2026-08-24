@@ -1,0 +1,5 @@
+@font-face { font-family: "Press Start 2P"; src: url("../../../assets/fonts/press-start-2p-latin.woff2") format("woff2"); font-style: normal; font-weight: 400; font-display: swap; }
+:root { --game-font: "Press Start 2P", "Courier New", monospace; }
+body { font-size: 13px; letter-spacing: .02em; }
+.feature-panel h2 { font-size: .68rem; line-height: 1.5; }
+.feature-value { font-size: 1.2rem; line-height: 1.5; }

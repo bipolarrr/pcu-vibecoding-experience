@@ -1,0 +1,1 @@
+{"id":"chrome-neon","requires":[],"conflicts":["chrome-pixel","chrome-minimal"],"replaces":["chrome-pixel","chrome-minimal"],"uiSlots":[]}

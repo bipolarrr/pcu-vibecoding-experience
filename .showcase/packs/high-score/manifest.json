@@ -1,0 +1,1 @@
+{"id":"high-score","requires":["score"],"conflicts":[],"replaces":[],"uiSlots":["hud-left"]}

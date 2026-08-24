@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title data-i18n="test.documentTitle"></title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="../src/base.css" />
+  </head>
+  <body>
+    <main id="game-shell" data-i18n-aria-label="app.ariaLabel">
+      <section id="hud-left" class="feature-slot" data-slot="hud-left"></section>
+      <section id="board-stage"><div id="board" role="grid" data-i18n-aria-label="board.ariaLabel"></div><div id="effects" class="feature-slot" data-slot="effects"></div><div id="overlay" class="feature-slot" data-slot="overlay"></div></section>
+      <section id="hud-right" class="feature-slot" data-slot="hud-right"></section>
+    </main>
+    <section id="settings" class="feature-slot" data-slot="settings"></section>
+    <p id="baseline-status"></p>
+    <pre id="test-result" hidden></pre>
+    <script type="module" src="./browser-complete.js"></script>
+  </body>
+</html>

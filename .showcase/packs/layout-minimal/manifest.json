@@ -1,0 +1,1 @@
+{"id":"layout-minimal","requires":[],"conflicts":["layout-neon","layout-pixel"],"replaces":["layout-neon","layout-pixel"],"uiSlots":[]}

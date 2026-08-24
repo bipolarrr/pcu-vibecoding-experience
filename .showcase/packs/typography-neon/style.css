@@ -1,0 +1,5 @@
+@font-face { font-family: "Oxanium"; src: url("../../../assets/fonts/oxanium-latin.woff2") format("woff2"); font-style: normal; font-weight: 400 700; font-display: swap; }
+:root { --game-font: "Oxanium", "Arial Narrow", sans-serif; }
+body { letter-spacing: .035em; }
+.feature-panel h2 { color: var(--accent); letter-spacing: .18em; text-transform: uppercase; }
+.feature-value { font-weight: 700; }

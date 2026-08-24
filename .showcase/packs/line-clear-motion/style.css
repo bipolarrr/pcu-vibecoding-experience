@@ -1,0 +1,3 @@
+.line-flash-layer { position: absolute; inset: 0; }
+.line-flash { position: absolute; top: calc(var(--row) * 5%); left: 0; width: 100%; height: 5%; background: white; mix-blend-mode: screen; animation: line-flash 300ms ease-out forwards; }
+@keyframes line-flash { 0% { opacity: 0; transform: scaleX(.2); } 35% { opacity: 1; transform: scaleX(1); } 100% { opacity: 0; transform: scaleX(1.08); } }

@@ -1,0 +1,4 @@
+.feature-panel, .feature-button { border: 1px solid color-mix(in srgb, var(--panel-border) 80%, transparent); border-radius: 7px; box-shadow: 0 0 14px color-mix(in srgb, var(--panel-border) 18%, transparent), inset 0 0 16px rgba(36,231,255,.025); backdrop-filter: blur(9px); }
+.feature-panel { position: relative; }
+.feature-panel::after { content: ""; position: absolute; width: 18px; height: 2px; right: 8px; top: 8px; background: var(--accent); box-shadow: 0 0 7px var(--accent); }
+.feature-button:hover { color: #071018; background: var(--accent); box-shadow: 0 0 18px var(--accent); }

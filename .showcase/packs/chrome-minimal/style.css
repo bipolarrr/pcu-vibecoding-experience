@@ -1,0 +1,4 @@
+.feature-panel, .feature-button { border: 1px solid var(--panel-border); border-radius: 12px; box-shadow: 0 8px 24px rgba(37,51,65,.07); }
+.feature-panel { padding: 14px; }
+.feature-button { transition: transform 120ms ease, box-shadow 120ms ease; }
+.feature-button:hover { transform: translateY(-1px); box-shadow: 0 10px 24px rgba(37,51,65,.12); }

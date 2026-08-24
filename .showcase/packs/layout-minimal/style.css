@@ -1,0 +1,6 @@
+body { margin: 0; min-height: 100vh; display: grid; place-items: center; }
+#game-shell { display: grid; grid-template-columns: 150px auto 150px; align-items: start; gap: 24px; padding: 42px 24px; }
+#hud-left, #hud-right { display: grid; gap: 10px; }
+#hud-left { text-align: right; }
+#settings { display: flex; align-items: flex-end; gap: 8px; }
+#baseline-status { position: fixed; left: 16px; bottom: 10px; }

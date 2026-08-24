@@ -1,0 +1,5 @@
+@font-face { font-family: "Inter"; src: url("../../../assets/fonts/inter-latin.woff2") format("woff2"); font-style: normal; font-weight: 400 700; font-display: swap; }
+:root { --game-font: "Inter", "Pretendard", system-ui, sans-serif; }
+body { letter-spacing: -.01em; }
+.feature-panel h2 { color: var(--muted); font-size: .7rem; font-weight: 650; letter-spacing: .12em; }
+.feature-value { font-weight: 650; }

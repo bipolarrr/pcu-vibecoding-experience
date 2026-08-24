@@ -1,0 +1,136 @@
+:root {
+  color-scheme: light;
+  --cell-size: min(4.2vh, 30px);
+  --board-background: #fff;
+  --board-border: #000;
+  --empty-cell: #fff;
+  --filled-cell: #111;
+  --grid-line: #d6d6d6;
+  --page-background: #fff;
+  --page-color: #000;
+  --panel-background: transparent;
+  --panel-border: #000;
+  --accent: #000;
+  --muted: #555;
+  --game-font: "Comic Sans MS", "Comic Sans", cursive;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  min-height: 100%;
+}
+
+body {
+  margin: 8px;
+  color: var(--page-color);
+  background: var(--page-background);
+  font-family: var(--game-font);
+}
+
+#game-shell {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+#board-stage {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+#board {
+  display: grid;
+  grid-template-columns: repeat(10, var(--cell-size));
+  grid-template-rows: repeat(20, var(--cell-size));
+  width: calc(10 * var(--cell-size) + 4px);
+  height: calc(20 * var(--cell-size) + 4px);
+  overflow: hidden;
+  background: var(--board-background);
+  border: 2px solid var(--board-border);
+}
+
+.cell {
+  width: var(--cell-size);
+  height: var(--cell-size);
+  background: var(--empty-cell);
+  border: 1px solid var(--grid-line);
+}
+
+.cell.is-filled,
+.cell.is-active {
+  background: var(--filled-cell);
+}
+
+.feature-slot:empty {
+  display: none;
+}
+
+#effects,
+#overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+#overlay {
+  z-index: 20;
+}
+
+#effects {
+  z-index: 10;
+  overflow: hidden;
+}
+
+#settings {
+  position: fixed;
+  right: 12px;
+  bottom: 12px;
+  z-index: 30;
+}
+
+.feature-panel {
+  min-width: 130px;
+  padding: 12px;
+  background: var(--panel-background);
+  border: 1px solid var(--panel-border);
+}
+
+.feature-panel h2,
+.feature-panel p {
+  margin: 0;
+}
+
+.feature-panel h2 {
+  margin-bottom: 8px;
+  font-size: 0.8rem;
+}
+
+.feature-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.feature-button {
+  padding: 8px 12px;
+  color: var(--page-color);
+  background: var(--panel-background);
+  border: 1px solid var(--panel-border);
+  font: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+#baseline-status {
+  min-height: 1.5em;
+  margin: 4px 0 0;
+}
+
+@media (max-height: 680px) {
+  :root {
+    --cell-size: 26px;
+  }
+}

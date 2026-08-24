@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title data-i18n="gallery.documentTitle"></title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="./src/gallery.css" />
+  </head>
+  <body>
+    <header class="gallery-header">
+      <p data-i18n="gallery.eyebrow"></p>
+      <h1 data-i18n="gallery.title"></h1>
+      <span data-i18n="gallery.subtitle"></span>
+    </header>
+    <main class="gallery-grid">
+      <article class="preview-card theme-neon" data-style="neon">
+        <div class="preview-meta"><span data-preview-number="1"></span><div><h2 data-i18n="gallery.neon.name"></h2><p data-i18n="gallery.neon.description"></p></div></div>
+        <div class="preview-stage"><div class="preview-side"><b data-i18n="panel.score"></b><strong data-preview-score="24800"></strong><b data-i18n="panel.level"></b><strong data-preview-level="7"></strong></div><div class="preview-board" data-i18n-aria-label="gallery.neon.ariaLabel"></div></div>
+      </article>
+      <article class="preview-card theme-pixel" data-style="pixel">
+        <div class="preview-meta"><span data-preview-number="2"></span><div><h2 data-i18n="gallery.pixel.name"></h2><p data-i18n="gallery.pixel.description"></p></div></div>
+        <div class="preview-stage"><div class="preview-side"><b data-i18n="panel.score"></b><strong data-preview-score="24800"></strong><b data-i18n="panel.level"></b><strong data-preview-level="7"></strong></div><div class="preview-board" data-i18n-aria-label="gallery.pixel.ariaLabel"></div></div>
+      </article>
+      <article class="preview-card theme-minimal" data-style="minimal">
+        <div class="preview-meta"><span data-preview-number="3"></span><div><h2 data-i18n="gallery.minimal.name"></h2><p data-i18n="gallery.minimal.description"></p></div></div>
+        <div class="preview-stage"><div class="preview-side"><b data-i18n="panel.score"></b><strong data-preview-score="24800"></strong><b data-i18n="panel.level"></b><strong data-preview-level="7"></strong></div><div class="preview-board" data-i18n-aria-label="gallery.minimal.ariaLabel"></div></div>
+      </article>
+    </main>
+    <a class="back-link" href="./index.html" data-i18n="gallery.back"></a>
+    <script type="module" src="./src/style-gallery.js"></script>
+  </body>
+</html>

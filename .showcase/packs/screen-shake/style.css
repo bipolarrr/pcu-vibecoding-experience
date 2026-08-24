@@ -1,0 +1,5 @@
+#game-shell.shake-soft { animation: shake-soft 160ms linear; }
+#game-shell.shake-strong { animation: shake-strong 220ms linear; }
+@keyframes shake-soft { 33% { transform: translateX(-2px); } 66% { transform: translateX(2px); } }
+@keyframes shake-strong { 20% { transform: translate(-5px,2px); } 40% { transform: translate(4px,-2px); } 60% { transform: translate(-3px,1px); } 80% { transform: translate(2px,-1px); } }
+@media (prefers-reduced-motion: reduce) { #game-shell.shake-soft, #game-shell.shake-strong { animation: none; } }

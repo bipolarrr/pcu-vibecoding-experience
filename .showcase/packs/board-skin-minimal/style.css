@@ -1,0 +1,3 @@
+#board { padding: 5px; gap: 2px; width: calc(10 * var(--cell-size) + 30px); height: calc(20 * var(--cell-size) + 50px); border: 1px solid var(--board-border); border-radius: 16px; box-shadow: 0 18px 50px rgba(41,55,71,.12); }
+.cell { border: 0; border-radius: 4px; }
+.cell.is-filled, .cell.is-active { box-shadow: inset 0 -2px 0 rgba(0,0,0,.1); }

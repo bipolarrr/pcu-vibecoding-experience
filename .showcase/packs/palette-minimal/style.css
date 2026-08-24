@@ -1,0 +1,24 @@
+:root {
+  color-scheme: light;
+  --page-color: #26313d;
+  --page-background: #f4f6f8;
+  --board-background: #ffffff;
+  --board-border: #cbd4dc;
+  --empty-cell: #f8fafb;
+  --filled-cell: #4263eb;
+  --grid-line: #edf0f2;
+  --panel-background: rgba(255, 255, 255, .9);
+  --panel-border: #dce2e7;
+  --accent: #4263eb;
+  --muted: #77838f;
+  --piece-I: #3aaed8; --piece-J: #5974d9; --piece-L: #e99a4b; --piece-O: #e5be45;
+  --piece-S: #58b87a; --piece-T: #9a72c7; --piece-Z: #df6b72;
+}
+.cell[data-type="I"] { --current-piece: var(--piece-I); }
+.cell[data-type="J"] { --current-piece: var(--piece-J); }
+.cell[data-type="L"] { --current-piece: var(--piece-L); }
+.cell[data-type="O"] { --current-piece: var(--piece-O); }
+.cell[data-type="S"] { --current-piece: var(--piece-S); }
+.cell[data-type="T"] { --current-piece: var(--piece-T); }
+.cell[data-type="Z"] { --current-piece: var(--piece-Z); }
+.cell.is-filled, .cell.is-active { background: var(--current-piece); }

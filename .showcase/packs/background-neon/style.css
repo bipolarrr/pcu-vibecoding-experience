@@ -1,0 +1,2 @@
+body { background-image: radial-gradient(circle at 20% 25%, rgba(255,63,209,.16), transparent 28%), radial-gradient(circle at 80% 70%, rgba(36,231,255,.13), transparent 32%), linear-gradient(rgba(255,255,255,.025) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.025) 1px, transparent 1px); background-size: auto, auto, 44px 44px, 44px 44px; }
+body::before { content: ""; position: fixed; inset: 0; pointer-events: none; background: linear-gradient(transparent 50%, rgba(0,0,0,.12) 50%); background-size: 100% 4px; opacity: .35; }

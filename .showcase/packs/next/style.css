@@ -1,0 +1,11 @@
+.next-list { display: grid; gap: 5px; }
+.mini-piece { display: grid; grid-template-columns: repeat(4, 12px); grid-template-rows: repeat(4, 12px); }
+.mini-cell { width: 12px; height: 12px; }
+.mini-cell.is-filled { background: var(--piece-color, var(--filled-cell)); border: 1px solid color-mix(in srgb, var(--piece-color, var(--filled-cell)) 70%, white); }
+.mini-piece[data-type="I"] { --piece-color: var(--piece-I, var(--filled-cell)); }
+.mini-piece[data-type="J"] { --piece-color: var(--piece-J, var(--filled-cell)); }
+.mini-piece[data-type="L"] { --piece-color: var(--piece-L, var(--filled-cell)); }
+.mini-piece[data-type="O"] { --piece-color: var(--piece-O, var(--filled-cell)); }
+.mini-piece[data-type="S"] { --piece-color: var(--piece-S, var(--filled-cell)); }
+.mini-piece[data-type="T"] { --piece-color: var(--piece-T, var(--filled-cell)); }
+.mini-piece[data-type="Z"] { --piece-color: var(--piece-Z, var(--filled-cell)); }

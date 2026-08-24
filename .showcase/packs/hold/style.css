@@ -1,0 +1,11 @@
+.hold-panel.is-disabled { opacity: 0.45; }
+.hold-panel .mini-piece { display: grid; grid-template-columns: repeat(4, 14px); grid-template-rows: repeat(4, 14px); }
+.hold-panel .mini-cell { width: 14px; height: 14px; }
+.hold-panel .mini-piece[data-type="I"] { --hold-piece: var(--piece-I, var(--filled-cell)); }
+.hold-panel .mini-piece[data-type="J"] { --hold-piece: var(--piece-J, var(--filled-cell)); }
+.hold-panel .mini-piece[data-type="L"] { --hold-piece: var(--piece-L, var(--filled-cell)); }
+.hold-panel .mini-piece[data-type="O"] { --hold-piece: var(--piece-O, var(--filled-cell)); }
+.hold-panel .mini-piece[data-type="S"] { --hold-piece: var(--piece-S, var(--filled-cell)); }
+.hold-panel .mini-piece[data-type="T"] { --hold-piece: var(--piece-T, var(--filled-cell)); }
+.hold-panel .mini-piece[data-type="Z"] { --hold-piece: var(--piece-Z, var(--filled-cell)); }
+.hold-panel .mini-cell.is-filled { background: var(--hold-piece, var(--filled-cell)); }

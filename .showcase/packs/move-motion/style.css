@@ -1,0 +1,4 @@
+.cell { transition: background-color 70ms ease, box-shadow 90ms ease, transform 70ms ease; }
+.cell.is-active { animation: active-cell-in 90ms ease-out; }
+@keyframes active-cell-in { from { transform: scale(0.88); opacity: 0.72; } to { transform: scale(1); opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .cell { transition: none; } .cell.is-active { animation: none; } }
