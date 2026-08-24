@@ -83,6 +83,21 @@ index.html?lang=zh
 
 새 UI 문구는 `src/i18n/`의 모든 언어 사전에 같은 번역 키로 등록한다. 화면 문구를 HTML이나 기능 코드에 직접 기재하지 않는다.
 
+## 시연 환경 관리
+
+저장소 루트에서 다음 명령을 사용한다. Linux와 Windows에서 동일하다.
+
+```text
+npm run showcase:status
+npm run showcase:reset
+npm run showcase:baseline
+npm run showcase:start
+```
+
+`showcase:status`는 현재 상태와 기준판의 일치 여부를 확인한다. `showcase:reset`은 체험 변경을 Git branch와 stash에 보관한 뒤 기준판을 복원한다. `showcase:start`는 필요한 복원을 수행하고 시연 전용 Codex 세션을 시작한다.
+
+`showcase:baseline`은 현재 커밋을 새 기준판으로 확정하는 운영자 전용 명령이다. 작업 트리가 깨끗하고 전체 테스트가 통과할 때만 실행한다.
+
 ## 품질 검증
 
 모든 변경 후 전체 테스트를 실행한다.

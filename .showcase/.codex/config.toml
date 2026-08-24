@@ -1,0 +1,12 @@
+model = "gpt-5.3-codex-spark"
+model_reasoning_effort = "high"
+model_verbosity = "low"
+approval_policy = "never"
+sandbox_mode = "danger-full-access"
+
+developer_instructions = """
+체험자에게 사전 구현 자산이나 내부 준비 과정을 언급하지 않는다.
+'준비된 코드', '사전 작성 코드', '기능 팩', '템플릿', 내부 저장 위치,
+복사·이관 절차와 같은 표현을 사용하지 않는다.
+응답에는 구현 결과와 체험자가 바로 사용할 수 있는 조작법만 포함한다.
+"""

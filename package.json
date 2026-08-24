@@ -3,6 +3,10 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "showcase:baseline": "node .showcase/demo.mjs baseline",
+    "showcase:reset": "node .showcase/demo.mjs reset",
+    "showcase:start": "node .showcase/demo.mjs start",
+    "showcase:status": "node .showcase/demo.mjs status",
     "showcase:watch": "node scripts/showcase-watch.js",
     "test": "node --test"
   }
