@@ -56,7 +56,7 @@ function createRepository() {
   return repo;
 }
 
-test("showcase:baseline은 기준 태그를 지정하고 이전 기준을 이력으로 보관한다", () => {
+test("showcase:baseline은 로컬 시연 브랜치의 최신 커밋을 기준으로 지정한다", () => {
   const repo = createRepository();
   writeFileSync(join(repo, "uncommitted.txt"), "not ready\n");
   assert.equal(cli(repo, "baseline").status, 2);
@@ -64,7 +64,7 @@ test("showcase:baseline은 기준 태그를 지정하고 이전 기준을 이력
 
   const first = cli(repo, "baseline");
   assert.equal(first.status, 0, first.stderr || first.stdout);
-  const firstBaseline = git(repo, "rev-parse", "showcase-baseline^{commit}");
+  const firstBaseline = git(repo, "rev-parse", "showcase-demo^{commit}");
   assert.equal(firstBaseline, git(repo, "rev-parse", "HEAD"));
 
   writeFileSync(join(repo, "game.txt"), "next baseline\n");
@@ -73,10 +73,9 @@ test("showcase:baseline은 기준 태그를 지정하고 이전 기준을 이력
 
   const second = cli(repo, "baseline");
   assert.equal(second.status, 0, second.stderr || second.stdout);
-  assert.equal(git(repo, "rev-parse", "showcase-baseline^{commit}"), git(repo, "rev-parse", "HEAD"));
-  const history = git(repo, "tag", "--list", "showcase-baseline-history/*");
-  assert.match(history, /^showcase-baseline-history\//);
-  assert.equal(git(repo, "rev-parse", `${history}^{commit}`), firstBaseline);
+  assert.equal(git(repo, "rev-parse", "showcase-demo^{commit}"), git(repo, "rev-parse", "HEAD"));
+  assert.notEqual(git(repo, "rev-parse", "showcase-demo^{commit}"), firstBaseline);
+  assert.equal(git(repo, "remote"), "");
 });
 
 test("showcase:reset은 변경을 보관하고 기준판을 복원하며 ignored 파일을 유지한다", () => {
@@ -100,6 +99,7 @@ test("showcase:reset은 변경을 보관하고 기준판을 복원하며 ignored
   assert.equal(git(repo, "branch", "--show-current"), "showcase-demo");
   assert.equal(git(repo, "status", "--porcelain=v1", "--untracked-files=all"), "");
 
+  git(repo, "switch", "-c", "participant-session");
   writeFileSync(join(repo, "game.txt"), "committed participant change\n");
   git(repo, "add", "game.txt");
   git(repo, "commit", "-m", "participant commit");
@@ -110,7 +110,7 @@ test("showcase:reset은 변경을 보관하고 기준판을 복원하며 ignored
   const archive = git(repo, "branch", "--format=%(refname:short)", "--list", "showcase-archive/*");
   assert.match(archive, /^showcase-archive\//);
   assert.equal(git(repo, "rev-parse", archive), participantCommit);
-  assert.equal(git(repo, "rev-parse", "HEAD"), git(repo, "rev-parse", "showcase-baseline^{commit}"));
+  assert.equal(git(repo, "rev-parse", "HEAD"), git(repo, "rev-parse", "showcase-demo^{commit}"));
 });
 
 test("진행 중인 Git 작업과 실패하는 기준판에서는 자동 복원을 중단한다", () => {
@@ -130,7 +130,7 @@ test("진행 중인 Git 작업과 실패하는 기준판에서는 자동 복원�
   );
   git(failingRepo, "add", "tests/smoke.test.js");
   git(failingRepo, "commit", "-m", "failing baseline");
-  git(failingRepo, "tag", "showcase-baseline", "HEAD");
+  git(failingRepo, "branch", "showcase-demo", "HEAD");
   const env = { ...process.env };
   delete env.NODE_TEST_CONTEXT;
   const directFailure = run(process.execPath, ["--test"], failingRepo, env);

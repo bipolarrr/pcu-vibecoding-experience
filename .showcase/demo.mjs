@@ -3,7 +3,6 @@ import { existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-export const BASELINE_TAG = "showcase-baseline";
 export const DEMO_BRANCH = "showcase-demo";
 export const EXIT_READY = 0;
 export const EXIT_ERROR = 2;
@@ -129,11 +128,11 @@ export function inspectShowcase() {
     return { kind: "error", message: `진행 중인 Git ${operation} 작업이 있다.` };
   }
 
-  const baseline = resolveCommit(`refs/tags/${BASELINE_TAG}`);
+  const baseline = resolveCommit(`refs/heads/${DEMO_BRANCH}`);
   if (!baseline) {
     return {
       kind: "error",
-      message: `${BASELINE_TAG} 태그가 없다. 운영자가 npm run showcase:baseline을 실행해야 한다.`,
+      message: `${DEMO_BRANCH} 브랜치가 없다. 운영자가 npm run showcase:baseline을 실행해야 한다.`,
     };
   }
 
@@ -199,29 +198,20 @@ export function baselineCommand() {
 
     runTests();
     const head = gitOutput(["rev-parse", "HEAD"], "현재 커밋 확인");
-    const previous = resolveCommit(`refs/tags/${BASELINE_TAG}`);
-    let historyTag = null;
-
-    if (previous && previous !== head) {
-      historyTag = uniqueRef(`showcase-baseline-history/${timestamp()}-${previous.slice(0, 7)}`);
-      requireSuccess(
-        git(["tag", "-a", historyTag, previous, "-m", `Previous showcase baseline ${previous}`]),
-        "이전 기준판 태그 보관",
-      );
-    }
-
-    if (previous === head) {
-      console.log(`기준판 유지 · ${BASELINE_TAG} · ${head.slice(0, 7)}`);
+    const previous = resolveCommit(`refs/heads/${DEMO_BRANCH}`);
+    if (currentBranch() === DEMO_BRANCH) {
+      console.log(`기준판 유지 · ${DEMO_BRANCH} · ${head.slice(0, 7)}`);
       return EXIT_READY;
     }
 
-    const tagArgs = previous
-      ? ["tag", "-f", "-a", BASELINE_TAG, head, "-m", `Showcase baseline ${head}`]
-      : ["tag", "-a", BASELINE_TAG, head, "-m", `Showcase baseline ${head}`];
-    requireSuccess(git(tagArgs), "기준판 태그 지정");
+    const occupiedWorktree = targetBranchInAnotherWorktree();
+    if (occupiedWorktree) {
+      throw new Error(`${DEMO_BRANCH} 브랜치가 다른 worktree에서 사용 중이다: ${occupiedWorktree}`);
+    }
 
-    console.log(`기준판 확정 · ${BASELINE_TAG} · ${head.slice(0, 7)}`);
-    if (historyTag) console.log(`이전 기준판 보관 · ${historyTag}`);
+    requireSuccess(git(["branch", "-f", DEMO_BRANCH, head]), "시연 기준 브랜치 지정");
+    console.log(`기준판 확정 · ${DEMO_BRANCH} · ${head.slice(0, 7)}`);
+    if (previous && previous !== head) console.log(`이전 기준 커밋 · ${previous.slice(0, 7)}`);
     return EXIT_READY;
   } catch (error) {
     console.error(`기준판 확정 실패 · ${error.message}`);
@@ -250,9 +240,9 @@ export function resetCommand() {
     const operation = activeGitOperation();
     if (operation) throw new Error(`진행 중인 Git ${operation} 작업이 있다.`);
 
-    const baseline = resolveCommit(`refs/tags/${BASELINE_TAG}`);
+    const baseline = resolveCommit(`refs/heads/${DEMO_BRANCH}`);
     if (!baseline) {
-      throw new Error(`${BASELINE_TAG} 태그가 없다. 운영자가 기준판을 먼저 확정해야 한다.`);
+      throw new Error(`${DEMO_BRANCH} 브랜치가 없다. 운영자가 기준판을 먼저 확정해야 한다.`);
     }
 
     const occupiedWorktree = targetBranchInAnotherWorktree();
