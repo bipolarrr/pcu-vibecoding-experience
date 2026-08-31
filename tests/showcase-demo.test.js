@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import {
+  chmodSync,
   copyFileSync,
   existsSync,
   mkdirSync,
@@ -10,7 +11,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { delimiter, dirname, join, resolve } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
@@ -29,10 +30,37 @@ function git(repo, ...args) {
   return result.stdout.trim();
 }
 
-function cli(repo, command) {
-  const env = { ...process.env };
+function cli(repo, command, overrides = {}) {
+  const env = { ...process.env, ...overrides };
   delete env.NODE_TEST_CONTEXT;
   return run(process.execPath, [join(repo, ".showcase", "demo.mjs"), command], repo, env);
+}
+
+function fakeCodexEnvironment() {
+  const bin = mkdtempSync(join(tmpdir(), "showcase-fake-codex-"));
+  const marker = join(bin, "codex-started.txt");
+
+  if (process.platform === "win32") {
+    writeFileSync(
+      join(bin, "codex.cmd"),
+      '@echo off\r\necho %* > "%SHOWCASE_CODEX_MARKER%"\r\n',
+    );
+  } else {
+    const executable = join(bin, "codex");
+    writeFileSync(
+      executable,
+      '#!/bin/sh\nprintf "%s\\n" "$@" > "$SHOWCASE_CODEX_MARKER"\n',
+    );
+    chmodSync(executable, 0o755);
+  }
+
+  return {
+    marker,
+    env: {
+      PATH: `${bin}${delimiter}${process.env.PATH ?? ""}`,
+      SHOWCASE_CODEX_MARKER: marker,
+    },
+  };
 }
 
 function createRepository() {
@@ -90,6 +118,10 @@ test("showcase:reset은 변경을 보관하고 기준판을 복원하며 ignored
   mkdirSync(join(repo, "runtime-cache"), { recursive: true });
   writeFileSync(join(repo, "runtime-cache", "keep.txt"), "keep\n");
 
+  const dirtyStatus = cli(repo, "status");
+  assert.equal(dirtyStatus.status, 0, dirtyStatus.stderr || dirtyStatus.stdout);
+  assert.match(dirtyStatus.stdout, /시연 진행 중 · 기존 변경 유지/);
+
   const dirtyReset = cli(repo, "reset");
   assert.equal(dirtyReset.status, 0, dirtyReset.stderr || dirtyReset.stdout);
   assert.equal(readFileSync(join(repo, "game.txt"), "utf8"), "baseline\n");
@@ -111,6 +143,32 @@ test("showcase:reset은 변경을 보관하고 기준판을 복원하며 ignored
   assert.match(archive, /^showcase-archive\//);
   assert.equal(git(repo, "rev-parse", archive), participantCommit);
   assert.equal(git(repo, "rev-parse", "HEAD"), git(repo, "rev-parse", "showcase-demo^{commit}"));
+});
+
+test("showcase:start은 누적 변경을 유지하고 불일치 상태를 자동 초기화하지 않는다", () => {
+  const repo = createRepository();
+  assert.equal(cli(repo, "baseline").status, 0);
+
+  const mismatchedCodex = fakeCodexEnvironment();
+  const mismatchedStart = cli(repo, "start", mismatchedCodex.env);
+  assert.equal(mismatchedStart.status, 10, mismatchedStart.stderr || mismatchedStart.stdout);
+  assert.equal(existsSync(mismatchedCodex.marker), false);
+  assert.equal(git(repo, "branch", "--show-current"), "master");
+  assert.equal(git(repo, "stash", "list", "--format=%gd"), "");
+
+  assert.equal(cli(repo, "reset").status, 0);
+  writeFileSync(join(repo, "game.txt"), "first participant change\n");
+  writeFileSync(join(repo, "new-feature.txt"), "second participant change\n");
+
+  const activeCodex = fakeCodexEnvironment();
+  const activeStart = cli(repo, "start", activeCodex.env);
+  assert.equal(activeStart.status, 0, activeStart.stderr || activeStart.stdout);
+  assert.match(activeStart.stdout, /시연 진행 중 · 기존 변경 유지/);
+  assert.equal(readFileSync(join(repo, "game.txt"), "utf8"), "first participant change\n");
+  assert.equal(readFileSync(join(repo, "new-feature.txt"), "utf8"), "second participant change\n");
+  assert.equal(git(repo, "stash", "list", "--format=%gd"), "");
+  assert.match(readFileSync(activeCodex.marker, "utf8"), /-C/);
+  assert.match(readFileSync(activeCodex.marker, "utf8"), /\.showcase/);
 });
 
 test("진행 중인 Git 작업과 실패하는 기준판에서는 자동 복원을 중단한다", () => {

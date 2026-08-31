@@ -1,9 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { readFile, readdir, stat } from "node:fs/promises";
-import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 const packsRoot = new URL("../.showcase/packs/", import.meta.url);
+const repositoryRoot = fileURLToPath(new URL("../", import.meta.url));
 
 async function loadCatalog() {
   const entries = await readdir(packsRoot);
@@ -49,7 +51,12 @@ test("기능 팩은 다른 기능 팩을 직접 import하지 않는다", async (
   }
 });
 
-test("기준 상태에는 활성 기능이 없다", async () => {
-  const source = await readFile(new URL("../src/features/enabled.js", import.meta.url), "utf8");
-  assert.match(source, /enabledFeatures\s*=\s*\[\]/);
+test("커밋된 기준 상태에는 활성 기능이 없다", () => {
+  const result = spawnSync("git", ["show", "HEAD:src/features/enabled.js"], {
+    cwd: repositoryRoot,
+    encoding: "utf8",
+    shell: false,
+  });
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+  assert.match(result.stdout, /enabledFeatures\s*=\s*\[\]/);
 });

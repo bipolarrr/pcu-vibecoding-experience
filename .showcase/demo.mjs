@@ -147,10 +147,12 @@ export function inspectShowcase() {
   const reasons = [];
   if (branch !== DEMO_BRANCH) reasons.push(`현재 브랜치: ${branch}`);
   if (head !== baseline) reasons.push("HEAD가 기준판과 다름");
-  if (changes) reasons.push("작업 트리에 변경 사항이 있음");
 
-  if (reasons.length === 0) return { kind: "ready", branch, head, baseline, changes };
-  return { kind: "reset-needed", branch, head, baseline, changes, reasons };
+  if (reasons.length > 0) {
+    return { kind: "reset-needed", branch, head, baseline, changes, reasons };
+  }
+  if (changes) return { kind: "active", branch, head, baseline, changes };
+  return { kind: "ready", branch, head, baseline, changes };
 }
 
 function printStatus(status) {
@@ -158,8 +160,12 @@ function printStatus(status) {
     console.log(`시연 준비 완료 · ${DEMO_BRANCH} · ${status.head.slice(0, 7)}`);
     return;
   }
+  if (status.kind === "active") {
+    console.log(`시연 진행 중 · 기존 변경 유지 · ${DEMO_BRANCH} · ${status.head.slice(0, 7)}`);
+    return;
+  }
   if (status.kind === "reset-needed") {
-    console.log("시연 환경 초기화 필요");
+    console.log("시연 환경 수동 초기화 필요");
     for (const reason of status.reasons) console.log(`- ${reason}`);
     return;
   }
@@ -170,7 +176,7 @@ export function statusCommand() {
   try {
     const status = inspectShowcase();
     printStatus(status);
-    if (status.kind === "ready") return EXIT_READY;
+    if (status.kind === "ready" || status.kind === "active") return EXIT_READY;
     if (status.kind === "reset-needed") return EXIT_RESET_NEEDED;
     return EXIT_ERROR;
   } catch (error) {
@@ -301,8 +307,11 @@ export function startCommand() {
   }
 
   if (status.kind === "error") return EXIT_ERROR;
-  if (status.kind === "reset-needed" && resetCommand() !== EXIT_READY) return EXIT_ERROR;
-  if (status.kind === "ready") console.log("시연 세션 시작");
+  if (status.kind === "reset-needed") {
+    console.error("시연 세션을 시작하지 않았다. 운영자가 npm run showcase:reset을 실행해야 한다.");
+    return EXIT_RESET_NEEDED;
+  }
+  console.log("시연 세션 시작");
 
   const executable = codexExecutableForPlatform();
   const result = spawnSync(executable, ["-C", showcaseDirectory], {
