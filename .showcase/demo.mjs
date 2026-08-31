@@ -3,7 +3,7 @@ import { existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-export const DEMO_BRANCH = "showcase-demo";
+export const DEMO_BRANCH = "showcase";
 export const EXIT_READY = 0;
 export const EXIT_ERROR = 2;
 export const EXIT_RESET_NEEDED = 10;

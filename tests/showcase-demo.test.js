@@ -92,7 +92,7 @@ test("showcase:baseline은 로컬 시연 브랜치의 최신 커밋을 기준으
 
   const first = cli(repo, "baseline");
   assert.equal(first.status, 0, first.stderr || first.stdout);
-  const firstBaseline = git(repo, "rev-parse", "showcase-demo^{commit}");
+  const firstBaseline = git(repo, "rev-parse", "showcase^{commit}");
   assert.equal(firstBaseline, git(repo, "rev-parse", "HEAD"));
 
   writeFileSync(join(repo, "game.txt"), "next baseline\n");
@@ -101,8 +101,8 @@ test("showcase:baseline은 로컬 시연 브랜치의 최신 커밋을 기준으
 
   const second = cli(repo, "baseline");
   assert.equal(second.status, 0, second.stderr || second.stdout);
-  assert.equal(git(repo, "rev-parse", "showcase-demo^{commit}"), git(repo, "rev-parse", "HEAD"));
-  assert.notEqual(git(repo, "rev-parse", "showcase-demo^{commit}"), firstBaseline);
+  assert.equal(git(repo, "rev-parse", "showcase^{commit}"), git(repo, "rev-parse", "HEAD"));
+  assert.notEqual(git(repo, "rev-parse", "showcase^{commit}"), firstBaseline);
   assert.equal(git(repo, "remote"), "");
 });
 
@@ -128,7 +128,7 @@ test("showcase:reset은 변경을 보관하고 기준판을 복원하며 ignored
   assert.equal(existsSync(join(repo, "new-feature.txt")), false);
   assert.equal(existsSync(join(repo, "runtime-cache", "keep.txt")), true);
   assert.match(git(repo, "stash", "list", "--format=%gd"), /^stash@\{0\}/);
-  assert.equal(git(repo, "branch", "--show-current"), "showcase-demo");
+  assert.equal(git(repo, "branch", "--show-current"), "showcase");
   assert.equal(git(repo, "status", "--porcelain=v1", "--untracked-files=all"), "");
 
   git(repo, "switch", "-c", "participant-session");
@@ -142,7 +142,7 @@ test("showcase:reset은 변경을 보관하고 기준판을 복원하며 ignored
   const archive = git(repo, "branch", "--format=%(refname:short)", "--list", "showcase-archive/*");
   assert.match(archive, /^showcase-archive\//);
   assert.equal(git(repo, "rev-parse", archive), participantCommit);
-  assert.equal(git(repo, "rev-parse", "HEAD"), git(repo, "rev-parse", "showcase-demo^{commit}"));
+  assert.equal(git(repo, "rev-parse", "HEAD"), git(repo, "rev-parse", "showcase^{commit}"));
 });
 
 test("showcase:start은 누적 변경을 유지하고 불일치 상태를 자동 초기화하지 않는다", () => {
@@ -188,7 +188,7 @@ test("진행 중인 Git 작업과 실패하는 기준판에서는 자동 복원�
   );
   git(failingRepo, "add", "tests/smoke.test.js");
   git(failingRepo, "commit", "-m", "failing baseline");
-  git(failingRepo, "branch", "showcase-demo", "HEAD");
+  git(failingRepo, "branch", "showcase", "HEAD");
   const env = { ...process.env };
   delete env.NODE_TEST_CONTEXT;
   const directFailure = run(process.execPath, ["--test"], failingRepo, env);

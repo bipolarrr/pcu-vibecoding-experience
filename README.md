@@ -94,15 +94,15 @@ npm run showcase:baseline
 npm run showcase:start
 ```
 
-`showcase:status`는 현재 상태와 로컬 `showcase-demo` 브랜치의 최신 커밋이 일치하는지 확인한다. 올바른 브랜치의 미커밋 변경은 초기화 대상이 아니라 현재 시연에서 누적 중인 변경으로 표시한다. `showcase:start`는 이 변경을 그대로 유지하고 시연 전용 Codex 세션을 시작하며 자동으로 초기화하지 않는다. `showcase:reset`은 운영자나 사용자가 명시적으로 실행할 때만 체험 변경을 Git branch와 stash에 보관한 뒤 기준 커밋을 복원한다. 이 명령들은 원격 저장소에 접근하지 않으므로 pull 이후에는 네트워크 없이 사용할 수 있다.
+`showcase:status`는 현재 상태와 로컬 `showcase` 브랜치의 최신 커밋이 일치하는지 확인한다. 올바른 브랜치의 미커밋 변경은 초기화 대상이 아니라 현재 시연에서 누적 중인 변경으로 표시한다. `showcase:start`는 이 변경을 그대로 유지하고 시연 전용 Codex 세션을 시작하며 자동으로 초기화하지 않는다. `showcase:reset`은 운영자나 사용자가 명시적으로 실행할 때만 체험 변경을 Git branch와 stash에 보관한 뒤 기준 커밋을 복원한다. 이 명령들은 원격 저장소에 접근하지 않으므로 pull 이후에는 네트워크 없이 사용할 수 있다.
 
-`showcase:baseline`은 현재 커밋을 로컬 `showcase-demo` 브랜치의 기준으로 확정하는 운영자 전용 명령이다. 작업 트리가 깨끗하고 전체 테스트가 통과할 때만 실행한다.
+`showcase:baseline`은 현재 커밋을 로컬 `showcase` 브랜치의 기준으로 확정하는 운영자 전용 명령이다. 작업 트리가 깨끗하고 전체 테스트가 통과할 때만 실행한다.
 
 행사 장비에서는 시연 전에 한 번만 아래 순서로 원격 기준판을 동기화한다.
 
 ```text
 npm run showcase:reset
-git pull --ff-only origin showcase-demo
+git pull --ff-only origin showcase
 npm run showcase:status
 ```
 
