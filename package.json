@@ -5,6 +5,7 @@
   "scripts": {
     "showcase:baseline": "node .showcase/demo.mjs baseline",
     "showcase:reset": "node .showcase/demo.mjs reset",
+    "showcase:restart-server": "node scripts/showcase-server.js --restart",
     "showcase:start": "node .showcase/demo.mjs start",
     "showcase:status": "node .showcase/demo.mjs status",
     "showcase:watch": "node scripts/showcase-watch.js",

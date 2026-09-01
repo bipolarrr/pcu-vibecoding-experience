@@ -15,7 +15,11 @@ import { delimiter, dirname, join, resolve } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { codexExecutableForPlatform } from "../.showcase/demo.mjs";
+import {
+  codexExecutableForPlatform,
+  launchWindowsShowcase,
+  windowsWindowCommand,
+} from "../.showcase/demo.mjs";
 
 const testDirectory = dirname(fileURLToPath(import.meta.url));
 const sourceCli = resolve(testDirectory, "../.showcase/demo.mjs");
@@ -59,6 +63,7 @@ function fakeCodexEnvironment() {
     env: {
       PATH: `${bin}${delimiter}${process.env.PATH ?? ""}`,
       SHOWCASE_CODEX_MARKER: marker,
+      SHOWCASE_START_INLINE: "1",
     },
   };
 }
@@ -208,7 +213,7 @@ test("공개 명령과 시연 전용 Codex 설정이 고정되어 있다", () =>
   const packageJson = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
   assert.deepEqual(
     Object.keys(packageJson.scripts).filter((name) => name.startsWith("showcase:")).sort(),
-    ["showcase:baseline", "showcase:reset", "showcase:start", "showcase:status", "showcase:watch"],
+    ["showcase:baseline", "showcase:reset", "showcase:restart-server", "showcase:start", "showcase:status", "showcase:watch"],
   );
 
   const config = readFileSync(join(root, ".showcase", ".codex", "config.toml"), "utf8");
@@ -221,4 +226,23 @@ test("공개 명령과 시연 전용 Codex 설정이 고정되어 있다", () =>
   assert.match(config, /system·developer prompt/);
   assert.equal(codexExecutableForPlatform("linux"), "codex");
   assert.equal(codexExecutableForPlatform("win32"), "codex.cmd");
+});
+
+test("Windows 시작은 서버와 Codex를 각각 새 cmd 창에서 실행한다", () => {
+  assert.deepEqual(windowsWindowCommand("node.exe", ["server.js"]), {
+    command: "cmd.exe",
+    args: ["/d", "/k", "node.exe", "server.js"],
+  });
+
+  const calls = [];
+  const plan = launchWindowsShowcase({
+    spawnImpl(command, args) {
+      calls.push({ command, args });
+    },
+  });
+  assert.deepEqual(calls, [plan.server, plan.codex]);
+  assert.equal(plan.server.command, "cmd.exe");
+  assert.equal(plan.server.args[1], "/k");
+  assert.equal(plan.server.args.at(-1).endsWith("showcase-server.js"), true);
+  assert.deepEqual(plan.codex.args.slice(-3), ["codex.cmd", "-C", resolve(testDirectory, "../.showcase")]);
 });

@@ -1,6 +1,6 @@
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 export const DEMO_BRANCH = "showcase";
@@ -296,6 +296,31 @@ export function codexExecutableForPlatform(platform = process.platform) {
   return platform === "win32" ? "codex.cmd" : "codex";
 }
 
+export function windowsWindowCommand(executable, args = []) {
+  return { command: "cmd.exe", args: ["/d", "/k", executable, ...args] };
+}
+
+function launchDetached(command, args, options = {}) {
+  const child = spawn(command, args, {
+    cwd: repositoryRoot,
+    detached: true,
+    stdio: "ignore",
+    windowsHide: false,
+    ...options,
+  });
+  child.unref();
+  return child;
+}
+
+export function launchWindowsShowcase({ spawnImpl = launchDetached } = {}) {
+  const serverScript = join(repositoryRoot, "scripts", "showcase-server.js");
+  const server = windowsWindowCommand(process.execPath, [serverScript]);
+  const codex = windowsWindowCommand(codexExecutableForPlatform("win32"), ["-C", showcaseDirectory]);
+  spawnImpl(server.command, server.args);
+  spawnImpl(codex.command, codex.args);
+  return { server, codex };
+}
+
 export function startCommand() {
   let status;
   try {
@@ -312,6 +337,22 @@ export function startCommand() {
     return EXIT_RESET_NEEDED;
   }
   console.log("시연 세션 시작");
+
+  if (process.platform === "win32" && process.env.SHOWCASE_START_INLINE !== "1") {
+    try {
+      launchWindowsShowcase();
+      console.log("게임 서버, 브라우저, Codex 창을 열었습니다.");
+      return EXIT_READY;
+    } catch (error) {
+      console.error(`시연 창 실행 실패 · ${error.message}`);
+      return EXIT_ERROR;
+    }
+  }
+
+  if (process.env.SHOWCASE_START_INLINE !== "1") {
+    const serverScript = join(repositoryRoot, "scripts", "showcase-server.js");
+    launchDetached(process.execPath, [serverScript]);
+  }
 
   const executable = codexExecutableForPlatform();
   const result = spawnSync(executable, ["-C", showcaseDirectory], {
