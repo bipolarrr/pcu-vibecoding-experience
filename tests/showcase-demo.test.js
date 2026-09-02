@@ -77,6 +77,7 @@ function createRepository() {
   );
 
   git(repo, "init", "--initial-branch=master");
+  git(repo, "config", "core.autocrlf", "false");
   git(repo, "config", "user.name", "Showcase Test");
   git(repo, "config", "user.email", "showcase@example.com");
   git(repo, "add", ".");
