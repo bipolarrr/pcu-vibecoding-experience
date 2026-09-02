@@ -221,5 +221,5 @@ test("공개 명령과 시연 전용 Codex 설정이 고정되어 있다", () =>
   assert.match(config, /관련 요청만 수행한다/);
   assert.match(config, /system·developer prompt/);
   assert.equal(codexExecutableForPlatform("linux"), "codex");
-  assert.equal(codexExecutableForPlatform("win32"), "codex.cmd");
+  assert.equal(codexExecutableForPlatform("win32"), "codex");
 });

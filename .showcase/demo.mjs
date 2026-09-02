@@ -293,7 +293,7 @@ export function resetCommand() {
 }
 
 export function codexExecutableForPlatform(platform = process.platform) {
-  return platform === "win32" ? "codex.cmd" : "codex";
+  return "codex";
 }
 
 export function startCommand() {
