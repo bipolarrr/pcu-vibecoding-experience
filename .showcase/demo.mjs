@@ -293,7 +293,7 @@ export function resetCommand() {
 }
 
 export function codexExecutableForPlatform(platform = process.platform) {
-  return platform === "win32" ? "codex.cmd" : "codex";
+  return platform === "win32" ? "codex.exe" : "codex";
 }
 
 export function startCommand() {
@@ -317,7 +317,7 @@ export function startCommand() {
   const result = spawnSync(executable, ["-C", showcaseDirectory], {
     cwd: repositoryRoot,
     encoding: "utf8",
-    shell: process.platform === "win32",
+    shell: false,
     stdio: "inherit",
   });
   if (result.error || result.status !== 0) {

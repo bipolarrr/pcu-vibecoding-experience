@@ -37,14 +37,22 @@ function cli(repo, command, overrides = {}) {
 }
 
 function fakeCodexEnvironment() {
-  const bin = mkdtempSync(join(tmpdir(), "showcase-fake-codex-"));
+  const bin = mkdtempSync(join(tmpdir(), "showcase-fake-codex 공간-"));
   const marker = join(bin, "codex-started.txt");
+  const extraEnvironment = {};
 
   if (process.platform === "win32") {
+    // Use a real executable so shell:false and paths containing spaces are tested.
+    copyFileSync(process.execPath, join(bin, "codex.exe"));
+    const preload = join(bin, "fake-codex.cjs");
     writeFileSync(
-      join(bin, "codex.cmd"),
-      '@echo off\r\necho %* > "%SHOWCASE_CODEX_MARKER%"\r\n',
+      preload,
+      'if (require("node:path").basename(process.execPath).toLowerCase() === "codex.exe") {\n'
+        + '  require("node:fs").writeFileSync(process.env.SHOWCASE_CODEX_MARKER, JSON.stringify(process.execArgv));\n'
+        + '  process.exit(0);\n'
+        + '}\n',
     );
+    extraEnvironment.NODE_OPTIONS = `${process.env.NODE_OPTIONS ?? ""} --require ${JSON.stringify(preload.replaceAll("\\", "/"))}`;
   } else {
     const executable = join(bin, "codex");
     writeFileSync(
@@ -57,6 +65,7 @@ function fakeCodexEnvironment() {
   return {
     marker,
     env: {
+      ...extraEnvironment,
       PATH: `${bin}${delimiter}${process.env.PATH ?? ""}`,
       SHOWCASE_CODEX_MARKER: marker,
     },
@@ -224,5 +233,5 @@ test("공개 명령과 시연 전용 Codex 설정이 고정되어 있다", () =>
   assert.match(config, /관련 요청만 수행한다/);
   assert.match(config, /system·developer prompt/);
   assert.equal(codexExecutableForPlatform("linux"), "codex");
-  assert.equal(codexExecutableForPlatform("win32"), "codex.cmd");
+  assert.equal(codexExecutableForPlatform("win32"), "codex.exe");
 });
