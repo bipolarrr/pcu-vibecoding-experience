@@ -63,7 +63,7 @@ function fakeCodexEnvironment() {
   };
 }
 
-function createRepository() {
+function createRepository({ autocrlf } = {}) {
   const repo = mkdtempSync(join(tmpdir(), "showcase-시연 공간-"));
   mkdirSync(join(repo, ".showcase"), { recursive: true });
   mkdirSync(join(repo, "tests"), { recursive: true });
@@ -77,6 +77,7 @@ function createRepository() {
   );
 
   git(repo, "init", "--initial-branch=master");
+  if (autocrlf !== undefined) git(repo, "config", "core.autocrlf", autocrlf);
   git(repo, "config", "user.name", "Showcase Test");
   git(repo, "config", "user.email", "showcase@example.com");
   git(repo, "add", ".");
@@ -106,44 +107,47 @@ test("showcase:baseline은 로컬 시연 브랜치의 최신 커밋을 기준으
   assert.equal(git(repo, "remote"), "");
 });
 
-test("showcase:reset은 변경을 보관하고 기준판을 복원하며 ignored 파일을 유지한다", () => {
-  const repo = createRepository();
-  assert.equal(cli(repo, "baseline").status, 0);
-  assert.equal(cli(repo, "status").status, 10);
-  assert.equal(cli(repo, "reset").status, 0);
-  assert.equal(cli(repo, "status").status, 0);
+for (const autocrlf of ["false", "true"]) {
+  test(`showcase:reset은 변경을 보관하고 기준판을 복원하며 ignored 파일을 유지한다 (core.autocrlf=${autocrlf})`, () => {
+    const repo = createRepository({ autocrlf });
+    assert.equal(cli(repo, "baseline").status, 0);
+    assert.equal(cli(repo, "status").status, 10);
+    assert.equal(cli(repo, "reset").status, 0);
+    assert.equal(cli(repo, "status").status, 0);
 
-  writeFileSync(join(repo, "game.txt"), "participant change\n");
-  writeFileSync(join(repo, "new-feature.txt"), "new feature\n");
-  mkdirSync(join(repo, "runtime-cache"), { recursive: true });
-  writeFileSync(join(repo, "runtime-cache", "keep.txt"), "keep\n");
+    writeFileSync(join(repo, "game.txt"), "participant change\n");
+    writeFileSync(join(repo, "new-feature.txt"), "new feature\n");
+    mkdirSync(join(repo, "runtime-cache"), { recursive: true });
+    writeFileSync(join(repo, "runtime-cache", "keep.txt"), "keep\n");
 
-  const dirtyStatus = cli(repo, "status");
-  assert.equal(dirtyStatus.status, 0, dirtyStatus.stderr || dirtyStatus.stdout);
-  assert.match(dirtyStatus.stdout, /시연 진행 중 · 기존 변경 유지/);
+    const dirtyStatus = cli(repo, "status");
+    assert.equal(dirtyStatus.status, 0, dirtyStatus.stderr || dirtyStatus.stdout);
+    assert.match(dirtyStatus.stdout, /시연 진행 중 · 기존 변경 유지/);
 
-  const dirtyReset = cli(repo, "reset");
-  assert.equal(dirtyReset.status, 0, dirtyReset.stderr || dirtyReset.stdout);
-  assert.equal(readFileSync(join(repo, "game.txt"), "utf8"), "baseline\n");
-  assert.equal(existsSync(join(repo, "new-feature.txt")), false);
-  assert.equal(existsSync(join(repo, "runtime-cache", "keep.txt")), true);
-  assert.match(git(repo, "stash", "list", "--format=%gd"), /^stash@\{0\}/);
-  assert.equal(git(repo, "branch", "--show-current"), "showcase");
-  assert.equal(git(repo, "status", "--porcelain=v1", "--untracked-files=all"), "");
+    const dirtyReset = cli(repo, "reset");
+    assert.equal(dirtyReset.status, 0, dirtyReset.stderr || dirtyReset.stdout);
+    // Git may restore text with CRLF on Windows; compare the complete text using LF.
+    assert.equal(readFileSync(join(repo, "game.txt"), "utf8").replace(/\r\n/g, "\n"), "baseline\n");
+    assert.equal(existsSync(join(repo, "new-feature.txt")), false);
+    assert.equal(existsSync(join(repo, "runtime-cache", "keep.txt")), true);
+    assert.match(git(repo, "stash", "list", "--format=%gd"), /^stash@\{0\}/);
+    assert.equal(git(repo, "branch", "--show-current"), "showcase");
+    assert.equal(git(repo, "status", "--porcelain=v1", "--untracked-files=all"), "");
 
-  git(repo, "switch", "-c", "participant-session");
-  writeFileSync(join(repo, "game.txt"), "committed participant change\n");
-  git(repo, "add", "game.txt");
-  git(repo, "commit", "-m", "participant commit");
-  const participantCommit = git(repo, "rev-parse", "HEAD");
+    git(repo, "switch", "-c", "participant-session");
+    writeFileSync(join(repo, "game.txt"), "committed participant change\n");
+    git(repo, "add", "game.txt");
+    git(repo, "commit", "-m", "participant commit");
+    const participantCommit = git(repo, "rev-parse", "HEAD");
 
-  const committedReset = cli(repo, "reset");
-  assert.equal(committedReset.status, 0, committedReset.stderr || committedReset.stdout);
-  const archive = git(repo, "branch", "--format=%(refname:short)", "--list", "showcase-archive/*");
-  assert.match(archive, /^showcase-archive\//);
-  assert.equal(git(repo, "rev-parse", archive), participantCommit);
-  assert.equal(git(repo, "rev-parse", "HEAD"), git(repo, "rev-parse", "showcase^{commit}"));
-});
+    const committedReset = cli(repo, "reset");
+    assert.equal(committedReset.status, 0, committedReset.stderr || committedReset.stdout);
+    const archive = git(repo, "branch", "--format=%(refname:short)", "--list", "showcase-archive/*");
+    assert.match(archive, /^showcase-archive\//);
+    assert.equal(git(repo, "rev-parse", archive), participantCommit);
+    assert.equal(git(repo, "rev-parse", "HEAD"), git(repo, "rev-parse", "showcase^{commit}"));
+  });
+}
 
 test("showcase:start은 누적 변경을 유지하고 불일치 상태를 자동 초기화하지 않는다", () => {
   const repo = createRepository();
