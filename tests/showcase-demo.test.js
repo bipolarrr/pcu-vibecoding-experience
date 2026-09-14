@@ -54,7 +54,7 @@ function fakeCodexEnvironment() {
       'if (require("node:path").basename(process.execPath).toLowerCase() === "codex.exe") {\n'
         + '  const args = process.argv.slice(1);\n'
         + '  require("node:fs").appendFileSync(process.env.SHOWCASE_CODEX_MARKER, JSON.stringify(args) + "\\n");\n'
-        + '  if (args[0] === "exec") process.stdout.write("{\\"type\\":\\"thread.started\\",\\"thread_id\\":\\"0199a213-81c0-7800-8aa1-bbab2a035a53\\"}\\n");\n'
+        + '  if (require("node:path").basename(args[0] || "").toLowerCase() === "exec") process.stdout.write("{\\"type\\":\\"thread.started\\",\\"thread_id\\":\\"0199a213-81c0-7800-8aa1-bbab2a035a53\\"}\\n");\n'
         + '  process.exit(0);\n'
         + '}\n',
     );
@@ -232,6 +232,12 @@ test("시연 준비 프롬프트와 JSONL 세션 식별자를 안정적으로 �
     "prepared-thread",
   );
   assert.equal(threadIdFromJsonLines('{"type":"turn.completed"}\n'), null);
+  assert.equal(
+    threadIdFromJsonLines(
+      'diagnostic on stderr\n{"type":"thread.started","thread_id":"stderr-thread"}\n',
+    ),
+    "stderr-thread",
+  );
 });
 
 test("진행 중인 Git 작업과 실패하는 기준판에서는 자동 복원을 중단한다", () => {

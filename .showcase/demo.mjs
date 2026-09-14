@@ -534,7 +534,7 @@ function ensurePreparedSession(status, executable = codexExecutableForPlatform()
     throw new Error(`Codex 준비 실패 · ${detail}`);
   }
 
-  const threadId = threadIdFromJsonLines(preparation.stdout);
+  const threadId = threadIdFromJsonLines(`${preparation.stdout ?? ""}\n${preparation.stderr ?? ""}`);
   if (!threadId) throw new Error("Codex 준비 실패 · 준비된 세션 식별자를 확인할 수 없다.");
 
   cache.sessions[fingerprint] = { threadId, createdAt: new Date().toISOString() };
