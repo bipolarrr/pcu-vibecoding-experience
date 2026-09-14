@@ -1,4 +1,4 @@
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
   existsSync,
@@ -566,7 +566,67 @@ export function prepareCommand() {
   }
 }
 
-export function startCommand() {
+export function codexTerminalCommand(
+  platformName = process.platform,
+  environment = process.env,
+) {
+  if (platformName === "win32") {
+    return {
+      command: environment.ComSpec || "cmd.exe",
+      args: [
+        "/d",
+        "/s",
+        "/c",
+        "start",
+        "",
+        "cmd.exe",
+        "/d",
+        "/k",
+        "node",
+        ".showcase\\demo.mjs",
+        "session",
+      ],
+    };
+  }
+  if (platformName === "darwin") {
+    const escaped = repositoryRoot.replaceAll("\\", "\\\\").replaceAll('"', '\\"');
+    return {
+      command: "osascript",
+      args: [
+        "-e",
+        `tell application "Terminal" to do script "cd \\\"${escaped}\\\" && node .showcase/demo.mjs session"`,
+      ],
+    };
+  }
+  return {
+    command: "x-terminal-emulator",
+    args: ["-e", "bash", "-lc", "node .showcase/demo.mjs session; exec bash"],
+  };
+}
+
+export function startCommand({
+  platformName = process.platform,
+  environment = process.env,
+  spawnImpl = spawn,
+} = {}) {
+  try {
+    const specification = codexTerminalCommand(platformName, environment);
+    const child = spawnImpl(specification.command, specification.args, {
+      cwd: repositoryRoot,
+      detached: true,
+      stdio: "ignore",
+      windowsHide: false,
+    });
+    child.unref();
+    console.log("새 명령 창에서 Codex 시연 세션을 엽니다.");
+    return EXIT_READY;
+  } catch (error) {
+    console.error(`Codex 명령 창 실행 실패 · ${error.message}`);
+    return EXIT_ERROR;
+  }
+}
+
+export function sessionCommand() {
   try {
     const readiness = startableShowcaseStatus();
     if (readiness.exitCode !== null) return readiness.exitCode;
@@ -610,6 +670,7 @@ export function main(argv = process.argv.slice(2)) {
   if (command === "baseline") return baselineCommand();
   if (command === "prepare") return prepareCommand();
   if (command === "start") return startCommand();
+  if (command === "session") return sessionCommand();
   usage();
   return EXIT_ERROR;
 }

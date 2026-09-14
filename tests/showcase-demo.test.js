@@ -18,6 +18,8 @@ import { fileURLToPath } from "node:url";
 import {
   PREPARATION_PROMPT,
   codexExecutableForPlatform,
+  codexTerminalCommand,
+  startCommand,
   threadIdFromJsonLines,
 } from "../.showcase/demo.mjs";
 
@@ -169,12 +171,12 @@ for (const autocrlf of ["false", "true"]) {
   });
 }
 
-test("showcase:start은 누적 변경을 유지하고 불일치 상태를 자동 초기화하지 않는다", () => {
+test("Codex 시연 세션은 누적 변경을 유지하고 불일치 상태를 자동 초기화하지 않는다", () => {
   const repo = createRepository();
   assert.equal(cli(repo, "baseline").status, 0);
 
   const mismatchedCodex = fakeCodexEnvironment();
-  const mismatchedStart = cli(repo, "start", mismatchedCodex.env);
+  const mismatchedStart = cli(repo, "session", mismatchedCodex.env);
   assert.equal(mismatchedStart.status, 10, mismatchedStart.stderr || mismatchedStart.stdout);
   assert.equal(existsSync(mismatchedCodex.marker), false);
   assert.equal(git(repo, "branch", "--show-current"), "master");
@@ -189,7 +191,7 @@ test("showcase:start은 누적 변경을 유지하고 불일치 상태를 자동
   writeFileSync(join(repo, "game.txt"), "first participant change\n");
   writeFileSync(join(repo, "new-feature.txt"), "second participant change\n");
 
-  const activeStart = cli(repo, "start", activeCodex.env);
+  const activeStart = cli(repo, "session", activeCodex.env);
   assert.equal(activeStart.status, 0, activeStart.stderr || activeStart.stdout);
   assert.match(activeStart.stdout, /시연 진행 중 · 기존 변경 유지/);
   assert.equal(readFileSync(join(repo, "game.txt"), "utf8"), "first participant change\n");
@@ -205,7 +207,7 @@ test("showcase:start은 누적 변경을 유지하고 불일치 상태를 자동
   assert.doesNotMatch(activeStart.stdout, /골든 시연 문맥 준비 중/);
   assert.match(activeStart.stdout, /골든 시연 문맥 복제 · 대화형 세션 시작/);
 
-  const reusedStart = cli(repo, "start", activeCodex.env);
+  const reusedStart = cli(repo, "session", activeCodex.env);
   assert.equal(reusedStart.status, 0, reusedStart.stderr || reusedStart.stdout);
   assert.match(reusedStart.stdout, /골든 시연 문맥 복제 · 대화형 세션 시작/);
   const reusedCalls = readFileSync(activeCodex.marker, "utf8");
@@ -214,12 +216,51 @@ test("showcase:start은 누적 변경을 유지하고 불일치 상태를 자동
 
   mkdirSync(join(repo, "src", "features"), { recursive: true });
   writeFileSync(join(repo, "src", "features", "enabled.js"), "export const enabledFeatures = [];\n");
-  const changedStart = cli(repo, "start", activeCodex.env);
+  const changedStart = cli(repo, "session", activeCodex.env);
   assert.equal(changedStart.status, 0, changedStart.stderr || changedStart.stdout);
   assert.match(changedStart.stdout, /골든 시연 문맥 준비 중/);
   const changedCalls = readFileSync(activeCodex.marker, "utf8");
   assert.equal(changedCalls.match(/\bexec\b/g)?.length, 2);
   assert.equal(changedCalls.match(/\bfork\b/g)?.length, 3);
+});
+
+test("showcase:start은 PATH 기반 명령으로 별도 Codex 창을 연다", () => {
+  const windows = codexTerminalCommand("win32", {
+    ComSpec: "C:\\Windows\\System32\\cmd.exe",
+  });
+  assert.equal(windows.command, "C:\\Windows\\System32\\cmd.exe");
+  assert.deepEqual(windows.args, [
+    "/d",
+    "/s",
+    "/c",
+    "start",
+    "",
+    "cmd.exe",
+    "/d",
+    "/k",
+    "node",
+    ".showcase\\demo.mjs",
+    "session",
+  ]);
+  assert.equal(windows.args.some((argument) => argument.includes("Show Case")), false);
+
+  const linux = codexTerminalCommand("linux");
+  assert.equal(linux.command, "x-terminal-emulator");
+  assert.match(linux.args.at(-1), /node \.showcase\/demo\.mjs session/);
+
+  let invocation;
+  const exitCode = startCommand({
+    platformName: "win32",
+    environment: { ComSpec: "cmd.exe" },
+    spawnImpl(command, args, options) {
+      invocation = { command, args, options };
+      return { unref() {} };
+    },
+  });
+  assert.equal(exitCode, 0);
+  assert.equal(invocation.command, "cmd.exe");
+  assert.equal(invocation.options.detached, true);
+  assert.equal(invocation.options.windowsHide, false);
 });
 
 test("시연 준비 프롬프트와 JSONL 세션 식별자를 안정적으로 처리한다", () => {

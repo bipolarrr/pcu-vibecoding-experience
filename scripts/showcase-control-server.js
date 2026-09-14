@@ -196,27 +196,6 @@ export function browserCommand(url, platform = process.platform) {
   return { command: "xdg-open", args: [url] };
 }
 
-export function terminalCommand(root, script, platform = process.platform) {
-  if (platform === "win32") {
-    const commandLine = `cd /d "${root.replaceAll('"', '""')}" && npm run ${script}`;
-    return {
-      command: "cmd.exe",
-      args: ["/d", "/s", "/c", "start", "", "cmd.exe", "/d", "/k", commandLine],
-    };
-  }
-  if (platform === "darwin") {
-    const escaped = root.replaceAll("\\", "\\\\").replaceAll('"', '\\"');
-    return {
-      command: "osascript",
-      args: ["-e", `tell application "Terminal" to do script "cd \\\"${escaped}\\\" && npm run ${script}"`],
-    };
-  }
-  return {
-    command: "x-terminal-emulator",
-    args: ["-e", "bash", "-lc", `cd -- "$1" && npm run ${script}; exec bash`, "bash", root],
-  };
-}
-
 function launchDetached(specification) {
   return new Promise((accept, reject) => {
     const child = spawn(specification.command, specification.args, {
@@ -430,7 +409,7 @@ export function createActionExecutor({ root = projectRoot, services = new Servic
     if (action === "watch-stop") return { ...(await services.stopWatch()), code: "watch-stopped" };
     if (action === "showcase-start") {
       log("인공지능 도우미를 새 명령 창에서 엽니다.");
-      await launchDetached(terminalCommand(root, "showcase:start"));
+      await runNpmScript("showcase:start", { root });
       return { code: "codex-launched" };
     }
     if (action === "fresh-start") {
@@ -446,7 +425,7 @@ export function createActionExecutor({ root = projectRoot, services = new Servic
       log("5/6 인공지능 도우미가 프로젝트를 미리 파악합니다.");
       await runNpmScript("showcase:prepare", { root });
       log("6/6 인공지능 도우미를 새 명령 창에서 엽니다.");
-      await launchDetached(terminalCommand(root, "showcase:start"));
+      await runNpmScript("showcase:start", { root });
       return { code: "fresh-started" };
     }
 

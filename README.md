@@ -36,6 +36,15 @@
 
 게임 자체는 빌드 과정이 없는 정적 웹 애플리케이션이다. 시연 운영 페이지가 로컬에서 게임 서버와 Codex 실행을 제어하므로 VS Code 서버 확장은 필요하지 않다. 행사 장비에는 Git, Node.js, npm과 Codex가 설치되어 있어야 한다.
 
+Windows 시연 장비는 Scoop으로 설치하여 `PATH`에 등록된 Codex CLI를 기준으로 한다. 새 명령 프롬프트에서 아래 두 명령이 별도 경로 지정 없이 실행되어야 한다.
+
+```text
+node --version
+codex --version
+```
+
+시연 스크립트는 Scoop의 사용자별 설치 경로를 직접 사용하지 않고 `PATH`에서 `node`와 `codex`를 찾는다.
+
 Windows에서는 저장소 디렉터리에서 다음 명령으로 시연 운영 페이지를 연다.
 
 ```text
@@ -106,7 +115,7 @@ npm run showcase:control
 npm run showcase:start
 ```
 
-`showcase:status`는 현재 상태와 로컬 `showcase` 브랜치의 최신 커밋이 일치하는지 확인한다. 올바른 브랜치의 미커밋 변경은 초기화 대상이 아니라 현재 시연에서 누적 중인 변경으로 표시한다. `showcase:start`는 이 변경을 그대로 유지하고 시연 전용 Codex 세션을 시작하며 자동으로 초기화하지 않는다. `showcase:reset`은 운영자나 사용자가 명시적으로 실행할 때만 체험 변경을 Git branch와 stash에 보관한 뒤 기준 커밋을 복원한다. 이 명령들은 원격 저장소에 접근하지 않으므로 pull 이후에는 네트워크 없이 사용할 수 있다.
+`showcase:status`는 현재 상태와 로컬 `showcase` 브랜치의 최신 커밋이 일치하는지 확인한다. 올바른 브랜치의 미커밋 변경은 초기화 대상이 아니라 현재 시연에서 누적 중인 변경으로 표시한다. `showcase:start`는 현재 터미널을 점유하지 않고 별도 명령 창을 즉시 열며, 새 창에서 누적 변경을 그대로 유지한 시연 전용 Codex 세션을 시작한다. `showcase:reset`은 운영자나 사용자가 명시적으로 실행할 때만 체험 변경을 Git branch와 stash에 보관한 뒤 기준 커밋을 복원한다. 이 명령들은 원격 저장소에 접근하지 않으므로 pull 이후에는 네트워크 없이 사용할 수 있다.
 
 `showcase:baseline`은 현재 커밋을 로컬 `showcase` 브랜치의 기준으로 확정하는 운영자 전용 명령이다. 작업 트리가 깨끗하고 전체 테스트가 통과할 때만 실행한다.
 

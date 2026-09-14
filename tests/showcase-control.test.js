@@ -8,7 +8,6 @@ import {
   createActionExecutor,
   npmCommand,
   startControlServer,
-  terminalCommand,
 } from "../scripts/showcase-control-server.js";
 
 async function fixture(t, execute = async (action) => ({ code: `${action}-complete` })) {
@@ -103,15 +102,9 @@ test("작업 실행 중에는 충돌하는 두 번째 요청을 거절한다", a
   assert.equal((await first).status, 200);
 });
 
-test("운영체제별 브라우저와 Codex 터미널 명령을 명시적으로 구성한다", () => {
+test("운영체제별 브라우저 명령을 명시적으로 구성한다", () => {
   assert.equal(browserCommand("http://127.0.0.1:5174", "win32").command, "cmd.exe");
   assert.equal(browserCommand("http://127.0.0.1:5174", "linux").command, "xdg-open");
-  const windows = terminalCommand("C:\\Show Case", "showcase:start", "win32");
-  assert.equal(windows.command, "cmd.exe");
-  assert.match(windows.args.at(-1), /npm run showcase:start/);
-  const linux = terminalCommand("/tmp/show case", "showcase:start", "linux");
-  assert.equal(linux.command, "x-terminal-emulator");
-  assert.equal(linux.args.at(-1), "/tmp/show case");
 });
 
 test("Windows에서는 npm.cmd를 직접 spawn하지 않고 npm CLI를 Node로 실행한다", () => {
