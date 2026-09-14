@@ -22,7 +22,6 @@ export const projectRoot = resolve(dirname(scriptPath), "..");
 export const DEFAULT_CONTROL_PORT = 5174;
 export const DEFAULT_GAME_PORT = 5173;
 
-const npmExecutable = (platform = process.platform) => platform === "win32" ? "npm.cmd" : "npm";
 const delay = (milliseconds) => new Promise((accept) => setTimeout(accept, milliseconds));
 const now = () => new Date().toLocaleTimeString("ko-KR", { hour12: false });
 const log = (message) => console.log(`[${now()}] ${message}`);
@@ -41,6 +40,24 @@ const ACTION_LABELS = new Map([
   ["showcase-baseline", "현재 커밋을 기준판으로 확정"],
   ["test", "전체 테스트 실행"],
 ]);
+
+export function npmCommand(name, {
+  platform = process.platform,
+  execPath = process.execPath,
+  environment = process.env,
+} = {}) {
+  const npmCli = environment.npm_execpath;
+  if (typeof npmCli === "string" && /\.(?:c?js|mjs)$/i.test(npmCli)) {
+    return { command: execPath, args: [npmCli, "run", name] };
+  }
+  if (platform === "win32") {
+    return {
+      command: environment.ComSpec || "cmd.exe",
+      args: ["/d", "/s", "/c", `npm.cmd run ${name}`],
+    };
+  }
+  return { command: "npm", args: ["run", name] };
+}
 
 function safeStatus() {
   try {
@@ -75,7 +92,8 @@ export function classifyCommandFailure(error) {
 async function runNpmScript(name, { root = projectRoot, timeout = 5 * 60_000 } = {}) {
   log(`명령 실행: npm run ${name}`);
   return new Promise((accept, reject) => {
-    const child = spawn(npmExecutable(), ["run", name], {
+    const specification = npmCommand(name);
+    const child = spawn(specification.command, specification.args, {
       cwd: root,
       env: { ...process.env },
       stdio: ["ignore", "pipe", "pipe"],
@@ -256,7 +274,8 @@ export class ServiceManager {
   }
 
   #spawnScript(name) {
-    const child = spawn(npmExecutable(), ["run", name], {
+    const specification = npmCommand(name);
+    const child = spawn(specification.command, specification.args, {
       cwd: this.root,
       env: { ...process.env },
       windowsHide: true,

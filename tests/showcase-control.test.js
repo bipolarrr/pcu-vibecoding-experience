@@ -6,6 +6,7 @@ import {
   browserCommand,
   classifyCommandFailure,
   createActionExecutor,
+  npmCommand,
   startControlServer,
   terminalCommand,
 } from "../scripts/showcase-control-server.js";
@@ -111,6 +112,27 @@ test("운영체제별 브라우저와 Codex 터미널 명령을 명시적으로 
   const linux = terminalCommand("/tmp/show case", "showcase:start", "linux");
   assert.equal(linux.command, "x-terminal-emulator");
   assert.equal(linux.args.at(-1), "/tmp/show case");
+});
+
+test("Windows에서는 npm.cmd를 직접 spawn하지 않고 npm CLI를 Node로 실행한다", () => {
+  const command = npmCommand("showcase:reset", {
+    platform: "win32",
+    execPath: "C:\\Program Files\\nodejs\\node.exe",
+    environment: { npm_execpath: "C:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npm-cli.js" },
+  });
+  assert.equal(command.command, "C:\\Program Files\\nodejs\\node.exe");
+  assert.deepEqual(command.args, [
+    "C:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npm-cli.js",
+    "run",
+    "showcase:reset",
+  ]);
+
+  const fallback = npmCommand("test", {
+    platform: "win32",
+    environment: { ComSpec: "C:\\Windows\\System32\\cmd.exe" },
+  });
+  assert.equal(fallback.command, "C:\\Windows\\System32\\cmd.exe");
+  assert.deepEqual(fallback.args, ["/d", "/s", "/c", "npm.cmd run test"]);
 });
 
 test("명령 실패를 운영자가 이해할 수 있는 안정적인 오류 코드로 분류한다", () => {
