@@ -3,7 +3,7 @@ import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { startDevServer } from "../scripts/dev-server.js";
+import { DEV_SERVER_HEALTH_PATH, startDevServer } from "../scripts/dev-server.js";
 
 async function fixture(t) {
   const root = await mkdtemp(join(tmpdir(), "showcase-server 공간-"));
@@ -64,6 +64,15 @@ test("파일 수정·삭제·복원 후에도 서버를 재시작하지 않고 �
   await writeFile(path, "export const version = 1;");
   assert.equal(await (await fetch(url + "/src/main.js")).text(), "export const version = 1;");
   assert.equal((await fetch(url + "/")).status, 200);
+});
+
+test("개발 서버 상태 응답은 다른 프로젝트의 프로세스를 구분할 정보를 제공한다", async (t) => {
+  const { root, url } = await fixture(t);
+  const response = await fetch(url + DEV_SERVER_HEALTH_PATH);
+  assert.equal(response.status, 200);
+  const status = await response.json();
+  assert.equal(status.pid, process.pid);
+  assert.equal(status.root, root);
 });
 
 test("잘못된 요청과 내부 설정 요청은 거절하고 다음 요청은 처리한다", async (t) => {

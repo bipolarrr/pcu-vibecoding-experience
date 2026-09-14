@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title data-i18n="control.documentTitle"></title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="/showcase-control.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="hero">
+        <div>
+          <p class="eyebrow" data-i18n="control.eyebrow"></p>
+          <h1 data-i18n="control.title"></h1>
+          <p class="subtitle" data-i18n="control.subtitle"></p>
+        </div>
+        <button class="refresh" type="button" data-action="refresh" data-i18n="control.refresh"></button>
+      </header>
+
+      <section class="status-grid" data-i18n-aria-label="control.statusAriaLabel">
+        <article class="status-card">
+          <span data-i18n="control.gitStatus"></span>
+          <strong id="git-status" data-i18n="control.state.unavailable"></strong>
+        </article>
+        <article class="status-card">
+          <span data-i18n="control.verificationStatus"></span>
+          <strong id="verification-status" data-i18n="control.state.unavailable"></strong>
+        </article>
+        <article class="status-card">
+          <span data-i18n="control.gameStatus"></span>
+          <strong id="game-status" data-i18n="control.state.unavailable"></strong>
+        </article>
+        <article class="status-card">
+          <span data-i18n="control.watchStatus"></span>
+          <strong id="watch-status" data-i18n="control.state.unavailable"></strong>
+        </article>
+      </section>
+
+      <section class="launch-card">
+        <div>
+          <h2 data-i18n="control.freshTitle"></h2>
+          <p data-i18n="control.freshDescription"></p>
+        </div>
+        <button class="primary" type="button" data-action="fresh-start" data-i18n="control.freshButton"></button>
+      </section>
+
+      <p id="result" class="result" role="status" aria-live="polite"></p>
+
+      <section class="commands">
+        <h2 data-i18n="control.commandsTitle"></h2>
+        <div class="command-grid">
+          <article class="command-group">
+            <h3 data-i18n="control.groupGame"></h3>
+            <button type="button" data-action="dev-start" data-i18n="control.action.dev"></button>
+            <button type="button" data-action="dev-restart" data-i18n="control.action.devRestart"></button>
+            <button type="button" data-action="dev-stop" data-i18n="control.action.devStop"></button>
+          </article>
+          <article class="command-group">
+            <h3 data-i18n="control.groupCodex"></h3>
+            <button type="button" data-action="showcase-prepare" data-i18n="control.action.prepare"></button>
+            <button type="button" data-action="showcase-start" data-i18n="control.action.start"></button>
+            <button type="button" data-action="watch-start" data-i18n="control.action.watch"></button>
+            <button type="button" data-action="watch-stop" data-i18n="control.action.watchStop"></button>
+          </article>
+          <article class="command-group">
+            <h3 data-i18n="control.groupChecks"></h3>
+            <button type="button" data-action="showcase-status" data-i18n="control.action.status"></button>
+            <button type="button" data-action="test" data-i18n="control.action.test"></button>
+          </article>
+          <article class="command-group danger-zone">
+            <h3 data-i18n="control.groupDanger"></h3>
+            <button type="button" data-action="showcase-reset" data-confirm="true" data-i18n="control.action.reset"></button>
+            <button type="button" data-action="showcase-baseline" data-confirm="true" data-i18n="control.action.baseline"></button>
+          </article>
+        </div>
+      </section>
+    </main>
+    <script type="module" src="/showcase-control.js"></script>
+  </body>
+</html>

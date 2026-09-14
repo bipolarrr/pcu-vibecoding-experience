@@ -15,7 +15,11 @@ import { delimiter, dirname, join, resolve } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { codexExecutableForPlatform } from "../.showcase/demo.mjs";
+import {
+  PREPARATION_PROMPT,
+  codexExecutableForPlatform,
+  threadIdFromJsonLines,
+} from "../.showcase/demo.mjs";
 
 const testDirectory = dirname(fileURLToPath(import.meta.url));
 const sourceCli = resolve(testDirectory, "../.showcase/demo.mjs");
@@ -48,7 +52,9 @@ function fakeCodexEnvironment() {
     writeFileSync(
       preload,
       'if (require("node:path").basename(process.execPath).toLowerCase() === "codex.exe") {\n'
-        + '  require("node:fs").writeFileSync(process.env.SHOWCASE_CODEX_MARKER, JSON.stringify(process.execArgv));\n'
+        + '  const args = process.argv.slice(1);\n'
+        + '  require("node:fs").appendFileSync(process.env.SHOWCASE_CODEX_MARKER, JSON.stringify(args) + "\\n");\n'
+        + '  if (args[0] === "exec") process.stdout.write("{\\"type\\":\\"thread.started\\",\\"thread_id\\":\\"0199a213-81c0-7800-8aa1-bbab2a035a53\\"}\\n");\n'
         + '  process.exit(0);\n'
         + '}\n',
     );
@@ -57,7 +63,10 @@ function fakeCodexEnvironment() {
     const executable = join(bin, "codex");
     writeFileSync(
       executable,
-      '#!/bin/sh\nprintf "%s\\n" "$@" > "$SHOWCASE_CODEX_MARKER"\n',
+      '#!/bin/sh\nprintf "%s\\n" "---" "$@" >> "$SHOWCASE_CODEX_MARKER"\n'
+        + 'if [ "$1" = "exec" ]; then\n'
+        + '  printf "%s\\n" \'{"type":"thread.started","thread_id":"0199a213-81c0-7800-8aa1-bbab2a035a53"}\'\n'
+        + 'fi\n',
     );
     chmodSync(executable, 0o755);
   }
@@ -139,7 +148,9 @@ for (const autocrlf of ["false", "true"]) {
     assert.equal(readFileSync(join(repo, "game.txt"), "utf8").replace(/\r\n/g, "\n"), "baseline\n");
     assert.equal(existsSync(join(repo, "new-feature.txt")), false);
     assert.equal(existsSync(join(repo, "runtime-cache", "keep.txt")), true);
-    assert.match(git(repo, "stash", "list", "--format=%gd"), /^stash@\{0\}/);
+    assert.equal(git(repo, "stash", "list", "--format=%gd"), "");
+    assert.match(dirtyReset.stdout, /이전 시연 변경 정리 완료/);
+    assert.match(dirtyReset.stdout, /이전 검증 결과 사용/);
     assert.equal(git(repo, "branch", "--show-current"), "showcase");
     assert.equal(git(repo, "status", "--porcelain=v1", "--untracked-files=all"), "");
 
@@ -170,18 +181,57 @@ test("showcase:start은 누적 변경을 유지하고 불일치 상태를 자동
   assert.equal(git(repo, "stash", "list", "--format=%gd"), "");
 
   assert.equal(cli(repo, "reset").status, 0);
+  const activeCodex = fakeCodexEnvironment();
+  const prepared = cli(repo, "prepare", activeCodex.env);
+  assert.equal(prepared.status, 0, prepared.stderr || prepared.stdout);
+  assert.match(prepared.stdout, /골든 시연 문맥 준비 완료/);
+
   writeFileSync(join(repo, "game.txt"), "first participant change\n");
   writeFileSync(join(repo, "new-feature.txt"), "second participant change\n");
 
-  const activeCodex = fakeCodexEnvironment();
   const activeStart = cli(repo, "start", activeCodex.env);
   assert.equal(activeStart.status, 0, activeStart.stderr || activeStart.stdout);
   assert.match(activeStart.stdout, /시연 진행 중 · 기존 변경 유지/);
   assert.equal(readFileSync(join(repo, "game.txt"), "utf8"), "first participant change\n");
   assert.equal(readFileSync(join(repo, "new-feature.txt"), "utf8"), "second participant change\n");
   assert.equal(git(repo, "stash", "list", "--format=%gd"), "");
-  assert.match(readFileSync(activeCodex.marker, "utf8"), /-C/);
-  assert.match(readFileSync(activeCodex.marker, "utf8"), /\.showcase/);
+  const codexCalls = readFileSync(activeCodex.marker, "utf8");
+  assert.match(codexCalls, /exec/);
+  assert.match(codexCalls, /--json/);
+  assert.match(codexCalls, /fork/);
+  assert.match(codexCalls, /0199a213-81c0-7800-8aa1-bbab2a035a53/);
+  assert.match(codexCalls, /-C/);
+  assert.match(codexCalls, /\.showcase/);
+  assert.doesNotMatch(activeStart.stdout, /골든 시연 문맥 준비 중/);
+  assert.match(activeStart.stdout, /골든 시연 문맥 복제 · 대화형 세션 시작/);
+
+  const reusedStart = cli(repo, "start", activeCodex.env);
+  assert.equal(reusedStart.status, 0, reusedStart.stderr || reusedStart.stdout);
+  assert.match(reusedStart.stdout, /골든 시연 문맥 복제 · 대화형 세션 시작/);
+  const reusedCalls = readFileSync(activeCodex.marker, "utf8");
+  assert.equal(reusedCalls.match(/\bexec\b/g)?.length, 1);
+  assert.equal(reusedCalls.match(/\bfork\b/g)?.length, 2);
+
+  mkdirSync(join(repo, "src", "features"), { recursive: true });
+  writeFileSync(join(repo, "src", "features", "enabled.js"), "export const enabledFeatures = [];\n");
+  const changedStart = cli(repo, "start", activeCodex.env);
+  assert.equal(changedStart.status, 0, changedStart.stderr || changedStart.stdout);
+  assert.match(changedStart.stdout, /골든 시연 문맥 준비 중/);
+  const changedCalls = readFileSync(activeCodex.marker, "utf8");
+  assert.equal(changedCalls.match(/\bexec\b/g)?.length, 2);
+  assert.equal(changedCalls.match(/\bfork\b/g)?.length, 3);
+});
+
+test("시연 준비 프롬프트와 JSONL 세션 식별자를 안정적으로 처리한다", () => {
+  assert.match(PREPARATION_PROMPT, /파일을 절대 변경하지 마라/);
+  assert.match(PREPARATION_PROMPT, /프로젝트 전체를 다시 훑지 말고/);
+  assert.equal(
+    threadIdFromJsonLines(
+      'diagnostic\n{"type":"thread.started","thread_id":"prepared-thread"}\n{"type":"turn.completed"}\n',
+    ),
+    "prepared-thread",
+  );
+  assert.equal(threadIdFromJsonLines('{"type":"turn.completed"}\n'), null);
 });
 
 test("진행 중인 Git 작업과 실패하는 기준판에서는 자동 복원을 중단한다", () => {
@@ -221,11 +271,19 @@ test("공개 명령과 시연 전용 Codex 설정이 고정되어 있다", () =>
   const packageJson = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
   assert.deepEqual(
     Object.keys(packageJson.scripts).filter((name) => name.startsWith("showcase:")).sort(),
-    ["showcase:baseline", "showcase:reset", "showcase:start", "showcase:status", "showcase:watch"],
+    [
+      "showcase:baseline",
+      "showcase:control",
+      "showcase:prepare",
+      "showcase:reset",
+      "showcase:start",
+      "showcase:status",
+      "showcase:watch",
+    ],
   );
 
   const config = readFileSync(join(root, ".showcase", ".codex", "config.toml"), "utf8");
-  assert.match(config, /model = "gpt-5\.3-codex-spark"/);
+  assert.match(config, /model = "gpt-5\.6-terra"/);
   assert.match(config, /sandbox_mode = "danger-full-access"/);
   assert.match(config, /준비된 코드/);
   assert.match(config, /게임과 무관한 잡담/);

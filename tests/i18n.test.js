@@ -63,6 +63,7 @@ test("locale 사전 밖의 실행 코드와 정적 HTML에는 한국어 UI 문�
     "src/style-gallery.js",
     "index.html",
     "style-gallery.html",
+    "scripts/showcase-control.html",
     "tests/browser-complete.html",
   ];
   const packEntries = [
@@ -78,7 +79,12 @@ test("locale 사전 밖의 실행 코드와 정적 HTML에는 한국어 UI 문�
 });
 
 test("정적 HTML의 사용자 노출 텍스트는 번역 키 또는 실행 시 포맷 값으로 채운다", async () => {
-  for (const relativePath of ["index.html", "style-gallery.html", "tests/browser-complete.html"]) {
+  for (const relativePath of [
+    "index.html",
+    "style-gallery.html",
+    "scripts/showcase-control.html",
+    "tests/browser-complete.html",
+  ]) {
     const source = await readFile(resolve(projectRoot, relativePath), "utf8");
     const textNodes = [...source.matchAll(/>([^<]+)</g)]
       .map((match) => match[1].trim())

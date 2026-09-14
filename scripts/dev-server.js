@@ -4,6 +4,7 @@ import { extname, isAbsolute, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const repositoryRoot = fileURLToPath(new URL("../", import.meta.url));
+export const DEV_SERVER_HEALTH_PATH = "/__showcase_health";
 const types = {
   ".html": "text/html; charset=utf-8",
   ".js": "text/javascript; charset=utf-8",
@@ -30,6 +31,21 @@ export async function startDevServer({ rootDir = repositoryRoot, port = 5173 } =
       response.writeHead(status, { "Content-Type": "text/plain; charset=utf-8" });
       response.end(request.method === "HEAD" ? undefined : message);
     };
+    let requestUrl;
+    try {
+      requestUrl = new URL(request.url, "http://localhost");
+    } catch {
+      reply(400, "Invalid URL");
+      return;
+    }
+    if (
+      requestUrl.pathname === DEV_SERVER_HEALTH_PATH
+      && (request.method === "GET" || request.method === "HEAD")
+    ) {
+      response.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
+      response.end(request.method === "HEAD" ? undefined : JSON.stringify({ pid: process.pid, root }));
+      return;
+    }
     if (request.method !== "GET" && request.method !== "HEAD") {
       response.setHeader("Allow", "GET, HEAD");
       reply(405, "Method not allowed");
@@ -37,7 +53,7 @@ export async function startDevServer({ rootDir = repositoryRoot, port = 5173 } =
     }
     let pathname;
     try {
-      pathname = decodeURIComponent(new URL(request.url, "http://localhost").pathname);
+      pathname = decodeURIComponent(requestUrl.pathname);
     } catch {
       reply(400, "Invalid URL");
       return;

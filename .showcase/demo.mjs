@@ -1,12 +1,35 @@
 import { spawnSync } from "node:child_process";
-import { existsSync } from "node:fs";
+import { createHash } from "node:crypto";
+import {
+  existsSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { dirname, resolve } from "node:path";
+import { arch, platform } from "node:process";
 import { fileURLToPath } from "node:url";
 
 export const DEMO_BRANCH = "showcase";
 export const EXIT_READY = 0;
 export const EXIT_ERROR = 2;
 export const EXIT_RESET_NEEDED = 10;
+export const PREPARED_SESSIONS_VERSION = 1;
+export const VERIFICATION_CACHE_VERSION = 1;
+
+export const PREPARATION_PROMPT = `시연 시작 전 내부 준비 작업이다. 체험자의 게임 요청으로 처리하지 말고 파일을 절대 변경하지 마라.
+
+다음 문맥을 지금 이 세션 안에서 충분히 파악하라.
+- npm run showcase:status로 현재 시연 상태를 확인한다.
+- 저장소 루트 AGENTS.md와 현재 디렉터리에 적용되는 AGENTS.override.md의 운영 규칙을 정리한다.
+- .showcase/ACTIVATION.md와 .showcase/CATALOG.md, 모든 .showcase/packs/*/manifest.json을 읽어 기능별 requires, conflicts, replaces와 스타일 축을 파악한다.
+- package.json, index.html, src/features/enabled.js 전체와 src/features/의 현재 폴더 목록을 읽어 활성 상태를 파악한다.
+- src/core/, src/i18n/, scripts/, tests/의 파일 지형을 확인하고, 기능 구현에 쓰는 공개 event·capability·UI·i18n 계약과 검증 명령의 위치를 파악한다.
+- 현재 Git 변경 목록을 읽어 이미 누적된 시연 변경을 구분한다.
+
+웹 검색, 서버 시작·종료, 파일 수정, Git 변경은 하지 마라. 준비 이후 체험자의 요청이 오면 프로젝트 전체를 다시 훑지 말고, 운영 규칙상 매 요청마다 필수인 현재 활성 상태와 요청에 직접 관련된 파일만 확인하라. 마지막 응답은 정확히 "시연 준비 완료" 한 줄만 출력하라.`;
 
 const scriptPath = fileURLToPath(import.meta.url);
 export const repositoryRoot = resolve(dirname(scriptPath), "..");
@@ -16,6 +39,7 @@ function run(command, args, { cwd = repositoryRoot, stdio = "pipe" } = {}) {
   const result = spawnSync(command, args, {
     cwd,
     encoding: "utf8",
+    maxBuffer: 16 * 1024 * 1024,
     shell: false,
     stdio,
   });
@@ -176,7 +200,13 @@ export function statusCommand() {
   try {
     const status = inspectShowcase();
     printStatus(status);
-    if (status.kind === "ready" || status.kind === "active") return EXIT_READY;
+    if (status.kind === "ready" || status.kind === "active") {
+      const verification = inspectVerification(status.baseline);
+      console.log(verification.verified
+        ? `기준판 검증 완료 · ${verification.verifiedAt}`
+        : "기준판 재검증 필요");
+      return EXIT_READY;
+    }
     if (status.kind === "reset-needed") return EXIT_RESET_NEEDED;
     return EXIT_ERROR;
   } catch (error) {
@@ -191,6 +221,95 @@ function runTests() {
   if (result.status !== 0) throw new Error("테스트가 통과하지 않았다.");
 }
 
+function verificationCachePath() {
+  return resolve(repositoryRoot, gitPath("showcase-verification.json"));
+}
+
+function readVerificationCache() {
+  try {
+    const parsed = JSON.parse(readFileSync(verificationCachePath(), "utf8"));
+    if (parsed.version !== VERIFICATION_CACHE_VERSION || typeof parsed.fingerprint !== "string") {
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function verificationFingerprint(baseline) {
+  const gitVersion = outputOf(requireSuccess(git(["--version"]), "Git 버전 확인"));
+  const autocrlfResult = git(["config", "--get", "core.autocrlf"]);
+  const autocrlf = autocrlfResult.status === 0 ? outputOf(autocrlfResult) : "unset";
+  return createHash("sha256").update(JSON.stringify({
+    version: VERIFICATION_CACHE_VERSION,
+    baseline,
+    node: process.version,
+    platform: platform,
+    arch: arch,
+    git: gitVersion,
+    autocrlf,
+  })).digest("hex");
+}
+
+function writeVerificationCache(baseline) {
+  const cache = {
+    version: VERIFICATION_CACHE_VERSION,
+    fingerprint: verificationFingerprint(baseline),
+    baseline,
+    verifiedAt: new Date().toISOString(),
+  };
+  writeFileSync(verificationCachePath(), `${JSON.stringify(cache, null, 2)}\n`);
+  return cache;
+}
+
+export function clearCurrentVerification() {
+  rmSync(verificationCachePath(), { force: true });
+}
+
+function runQuickVerification() {
+  const enabled = resolve(repositoryRoot, "src/features/enabled.js");
+  if (!existsSync(enabled)) return;
+  const result = run(process.execPath, ["--check", enabled]);
+  requireSuccess(result, "활성 기능 진입 파일 확인");
+}
+
+export function inspectVerification(baseline = resolveCommit(`refs/heads/${DEMO_BRANCH}`)) {
+  if (!baseline) return { verified: false, reason: "baseline-missing" };
+  try {
+    const cache = readVerificationCache();
+    if (!cache) return { verified: false, reason: "cache-missing" };
+    if (cache.fingerprint !== verificationFingerprint(baseline)) {
+      return { verified: false, reason: "environment-changed", verifiedAt: cache.verifiedAt };
+    }
+    return { verified: true, reason: "unchanged", verifiedAt: cache.verifiedAt };
+  } catch {
+    return { verified: false, reason: "cache-unavailable" };
+  }
+}
+
+export function recordCurrentVerification() {
+  const status = inspectShowcase();
+  if (status.kind !== "ready") return false;
+  writeVerificationCache(status.baseline);
+  return true;
+}
+
+function ensureVerified(baseline, { force = false } = {}) {
+  runQuickVerification();
+  const verification = inspectVerification(baseline);
+  if (!force && verification.verified) {
+    console.log("기준판과 실행 환경 변경 없음 · 이전 검증 결과 사용");
+    return verification;
+  }
+  console.log("기준판 또는 실행 환경 변경 감지 · 전체 테스트 실행");
+  clearCurrentVerification();
+  runTests();
+  const cache = writeVerificationCache(baseline);
+  console.log("시연 환경 검증 완료");
+  return { verified: true, reason: "verified-now", verifiedAt: cache.verifiedAt };
+}
+
 export function baselineCommand() {
   try {
     const operation = activeGitOperation();
@@ -202,10 +321,12 @@ export function baselineCommand() {
     );
     if (changes) throw new Error("작업 트리가 깨끗하지 않다. 변경 사항을 먼저 커밋해야 한다.");
 
+    clearCurrentVerification();
     runTests();
     const head = gitOutput(["rev-parse", "HEAD"], "현재 커밋 확인");
     const previous = resolveCommit(`refs/heads/${DEMO_BRANCH}`);
     if (currentBranch() === DEMO_BRANCH) {
+      writeVerificationCache(head);
       console.log(`기준판 유지 · ${DEMO_BRANCH} · ${head.slice(0, 7)}`);
       return EXIT_READY;
     }
@@ -216,6 +337,7 @@ export function baselineCommand() {
     }
 
     requireSuccess(git(["branch", "-f", DEMO_BRANCH, head]), "시연 기준 브랜치 지정");
+    writeVerificationCache(head);
     console.log(`기준판 확정 · ${DEMO_BRANCH} · ${head.slice(0, 7)}`);
     if (previous && previous !== head) console.log(`이전 기준 커밋 · ${previous.slice(0, 7)}`);
     return EXIT_READY;
@@ -261,8 +383,9 @@ export function resetCommand() {
       ["status", "--porcelain=v1", "--untracked-files=all"],
       "작업 트리 상태 확인",
     );
+    const demoChanges = currentBranch() === DEMO_BRANCH && head === baseline;
     const archiveBranch = head !== baseline ? createArchiveBranch(head) : null;
-    const stashRef = changes ? stashChanges() : null;
+    const stashRef = changes && !demoChanges ? stashChanges() : null;
 
     if (currentBranch() === DEMO_BRANCH) {
       requireSuccess(git(["reset", "--hard", baseline], { stdio: "inherit" }), "기준판 복원");
@@ -274,7 +397,6 @@ export function resetCommand() {
     }
     requireSuccess(git(["clean", "-f", "-d"], { stdio: "inherit" }), "untracked 파일 정리");
 
-    runTests();
     const finalStatus = inspectShowcase();
     if (finalStatus.kind !== "ready") {
       throw new Error(
@@ -282,9 +404,12 @@ export function resetCommand() {
       );
     }
 
+    ensureVerified(baseline);
+
     console.log(`시연 환경 복원 완료 · ${baseline.slice(0, 7)}`);
     if (archiveBranch) console.log(`체험 커밋 보관 · ${archiveBranch}`);
     if (stashRef) console.log(`미커밋 변경 보관 · ${stashRef}`);
+    if (changes && demoChanges) console.log("이전 시연 변경 정리 완료");
     return EXIT_READY;
   } catch (error) {
     console.error(`시연 환경 복원 실패 · ${error.message}`);
@@ -296,40 +421,186 @@ export function codexExecutableForPlatform(platform = process.platform) {
   return platform === "win32" ? "codex.exe" : "codex";
 }
 
-export function startCommand() {
-  let status;
+export function threadIdFromJsonLines(output) {
+  for (const line of String(output ?? "").split(/\r?\n/)) {
+    if (!line.trim()) continue;
+    try {
+      const event = JSON.parse(line);
+      if (event.type === "thread.started" && typeof event.thread_id === "string") {
+        return event.thread_id;
+      }
+    } catch {
+      // Ignore non-JSON diagnostics and continue looking for the thread event.
+    }
+  }
+  return null;
+}
+
+const preparationFiles = [
+  "AGENTS.md",
+  ".showcase/AGENTS.override.md",
+  ".showcase/ACTIVATION.md",
+  ".showcase/CATALOG.md",
+  ".showcase/.codex/config.toml",
+  "package.json",
+  "index.html",
+];
+
+const preparationDirectories = ["src/core", "src/features", "src/i18n", "scripts", "tests"];
+
+function filesIn(directory, predicate = () => true) {
+  const absoluteDirectory = resolve(repositoryRoot, directory);
+  if (!existsSync(absoluteDirectory)) return [];
+
+  const files = [];
+  for (const entry of readdirSync(absoluteDirectory, { withFileTypes: true })) {
+    const relative = `${directory}/${entry.name}`;
+    if (entry.isDirectory()) files.push(...filesIn(relative, predicate));
+    else if (entry.isFile() && predicate(relative)) files.push(relative);
+  }
+  return files.sort();
+}
+
+export function preparationFingerprint(baseline) {
+  const hash = createHash("sha256");
+  hash.update(`version:${PREPARED_SESSIONS_VERSION}\nbaseline:${baseline}\nprompt:${PREPARATION_PROMPT}\n`);
+
+  const files = [
+    ...preparationFiles,
+    ...preparationDirectories.flatMap((directory) => filesIn(directory)),
+    ...filesIn(".showcase/packs", (path) => path.endsWith("/manifest.json")),
+  ].sort();
+
+  for (const file of files) {
+    const absolute = resolve(repositoryRoot, file);
+    hash.update(`\nfile:${file}\n`);
+    if (!existsSync(absolute) || !statSync(absolute).isFile()) {
+      hash.update("<missing>");
+      continue;
+    }
+    hash.update(readFileSync(absolute));
+  }
+  return hash.digest("hex");
+}
+
+function preparedSessionsPath() {
+  return resolve(repositoryRoot, gitPath("showcase-prepared-sessions.json"));
+}
+
+function readPreparedSessions() {
   try {
-    status = inspectShowcase();
-    printStatus(status);
-  } catch (error) {
-    console.error(`시연 환경 확인 실패 · ${error.message}`);
-    return EXIT_ERROR;
+    const parsed = JSON.parse(readFileSync(preparedSessionsPath(), "utf8"));
+    if (
+      parsed.version !== PREPARED_SESSIONS_VERSION
+      || !parsed.sessions
+      || typeof parsed.sessions !== "object"
+      || Array.isArray(parsed.sessions)
+    ) {
+      return { version: PREPARED_SESSIONS_VERSION, sessions: {} };
+    }
+    return parsed;
+  } catch {
+    return { version: PREPARED_SESSIONS_VERSION, sessions: {} };
+  }
+}
+
+function writePreparedSessions(cache) {
+  writeFileSync(preparedSessionsPath(), `${JSON.stringify(cache, null, 2)}\n`);
+}
+
+function forgetPreparedSession(fingerprint) {
+  const cache = readPreparedSessions();
+  if (!cache.sessions[fingerprint]) return;
+  delete cache.sessions[fingerprint];
+  if (Object.keys(cache.sessions).length === 0) rmSync(preparedSessionsPath(), { force: true });
+  else writePreparedSessions(cache);
+}
+
+function ensurePreparedSession(status, executable = codexExecutableForPlatform()) {
+  const fingerprint = preparationFingerprint(status.baseline);
+  const cache = readPreparedSessions();
+  const existing = cache.sessions[fingerprint];
+  if (existing && typeof existing.threadId === "string") {
+    return { fingerprint, threadId: existing.threadId, reused: true };
   }
 
-  if (status.kind === "error") return EXIT_ERROR;
+  console.log("골든 시연 문맥 준비 중 · 현재 프로젝트 상태 최초 1회");
+  const preparation = run(
+    executable,
+    ["exec", "--json", "-C", showcaseDirectory, PREPARATION_PROMPT],
+  );
+  if (preparation.status !== 0) {
+    const detail = errorOf(preparation) || outputOf(preparation) || `exit ${preparation.status}`;
+    throw new Error(`Codex 준비 실패 · ${detail}`);
+  }
+
+  const threadId = threadIdFromJsonLines(preparation.stdout);
+  if (!threadId) throw new Error("Codex 준비 실패 · 준비된 세션 식별자를 확인할 수 없다.");
+
+  cache.sessions[fingerprint] = { threadId, createdAt: new Date().toISOString() };
+  writePreparedSessions(cache);
+  return { fingerprint, threadId, reused: false };
+}
+
+function startableShowcaseStatus() {
+  const status = inspectShowcase();
+  printStatus(status);
+  if (status.kind === "error") return { exitCode: EXIT_ERROR, status };
   if (status.kind === "reset-needed") {
     console.error("시연 세션을 시작하지 않았다. 운영자가 npm run showcase:reset을 실행해야 한다.");
-    return EXIT_RESET_NEEDED;
+    return { exitCode: EXIT_RESET_NEEDED, status };
   }
-  console.log("시연 세션 시작");
+  return { exitCode: null, status };
+}
 
-  const executable = codexExecutableForPlatform();
-  const result = spawnSync(executable, ["-C", showcaseDirectory], {
-    cwd: repositoryRoot,
-    encoding: "utf8",
-    shell: false,
-    stdio: "inherit",
-  });
-  if (result.error || result.status !== 0) {
-    const detail = result.error?.message ?? `exit ${result.status}`;
-    console.error(`Codex 실행 실패 · ${detail}`);
+export function prepareCommand() {
+  try {
+    const readiness = startableShowcaseStatus();
+    if (readiness.exitCode !== null) return readiness.exitCode;
+    const prepared = ensurePreparedSession(readiness.status);
+    console.log(prepared.reused ? "골든 시연 문맥 준비 완료 · 기존 세션 재사용" : "골든 시연 문맥 준비 완료");
+    return EXIT_READY;
+  } catch (error) {
+    console.error(error.message);
     return EXIT_ERROR;
   }
-  return EXIT_READY;
+}
+
+export function startCommand() {
+  try {
+    const readiness = startableShowcaseStatus();
+    if (readiness.exitCode !== null) return readiness.exitCode;
+
+    const executable = codexExecutableForPlatform();
+    const prepared = ensurePreparedSession(readiness.status, executable);
+    console.log(
+      prepared.reused
+        ? "골든 시연 문맥 복제 · 대화형 세션 시작"
+        : "골든 시연 문맥 준비 완료 · 첫 복제 세션 시작",
+    );
+
+    const result = spawnSync(executable, ["fork", "-C", showcaseDirectory, prepared.threadId], {
+      cwd: repositoryRoot,
+      encoding: "utf8",
+      shell: false,
+      stdio: "inherit",
+    });
+    if (result.error || result.status !== 0) {
+      forgetPreparedSession(prepared.fingerprint);
+      const detail = result.error?.message ?? `exit ${result.status}`;
+      console.error(`Codex 실행 실패 · ${detail}`);
+      console.error("저장된 골든 세션 정보를 비웠다. 다시 실행하면 새로 준비한다.");
+      return EXIT_ERROR;
+    }
+    return EXIT_READY;
+  } catch (error) {
+    console.error(error.message);
+    return EXIT_ERROR;
+  }
 }
 
 function usage() {
-  console.log("사용법: npm run showcase:status|reset|baseline|start");
+  console.log("사용법: npm run showcase:status|reset|baseline|prepare|start");
 }
 
 export function main(argv = process.argv.slice(2)) {
@@ -337,6 +608,7 @@ export function main(argv = process.argv.slice(2)) {
   if (command === "status") return statusCommand();
   if (command === "reset") return resetCommand();
   if (command === "baseline") return baselineCommand();
+  if (command === "prepare") return prepareCommand();
   if (command === "start") return startCommand();
   usage();
   return EXIT_ERROR;
