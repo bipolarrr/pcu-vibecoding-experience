@@ -10,6 +10,7 @@ import { promisify } from "node:util";
 
 import {
   clearCurrentVerification,
+  interactiveTerminalEnvironment,
   inspectShowcase,
   inspectVerification,
   recordCurrentVerification,
@@ -31,14 +32,14 @@ const ACTION_LABELS = new Map([
   ["dev-start", "게임 서버 시작"],
   ["dev-restart", "게임 서버 재시작"],
   ["dev-stop", "게임 서버 중지"],
-  ["watch-start", "변경 감시 시작"],
-  ["watch-stop", "변경 감시 중지"],
+  ["watch-start", "변경 감시 창 열기"],
+  ["watch-stop", "변경 감시 창 닫기"],
   ["showcase-start", "인공지능 도우미 열기"],
   ["showcase-prepare", "인공지능 도우미 미리 준비"],
   ["showcase-status", "시연 상태 확인"],
   ["showcase-reset", "기준판으로 초기화"],
   ["showcase-baseline", "현재 커밋을 기준판으로 확정"],
-  ["test", "전체 테스트 실행"],
+  ["test", "시연 환경 점검"],
 ]);
 
 export function npmCommand(name, {
@@ -83,7 +84,7 @@ export function classifyCommandFailure(error) {
   if (/작업 트리가 깨끗하지 않다|working tree.*not clean/i.test(output)) return "working-tree-dirty";
   if (/showcase 브랜치가 없다|기준판을 먼저 확정/i.test(output)) return "baseline-missing";
   if (/다른 worktree에서 사용 중/i.test(output)) return "other-worktree";
-  if (/테스트가 통과하지 않았다|fail(?:ed|ure)|not ok/i.test(output)) return "tests-failed";
+  if (/시연 환경 점검 실패|fail(?:ed|ure)|not ok/i.test(output)) return "tests-failed";
   if (/Codex .*실패|codex.*(?:not found|failed)/i.test(output)) return "codex-failed";
   if (/Git (?:merge|rebase|cherry-pick|revert)|진행 중인 Git/i.test(output)) return "git-operation-active";
   return "command-failed";
@@ -184,7 +185,7 @@ async function resetFeaturesDuringDevelopment(root) {
     "--",
     "src/features",
   ], { windowsHide: true });
-  log("개발 중 상태이므로 현재 코드 전체를 한 번 검증합니다.");
+  log("개발 중 상태이므로 시연 필수 환경을 점검합니다.");
   await runNpmScript("test", { root });
 }
 
@@ -194,6 +195,33 @@ export function browserCommand(url, platform = process.platform) {
   }
   if (platform === "darwin") return { command: "open", args: [url] };
   return { command: "xdg-open", args: [url] };
+}
+
+export function watchTerminalCommand(
+  platform = process.platform,
+  environment = process.env,
+  root = projectRoot,
+) {
+  if (platform === "win32") {
+    return {
+      command: environment.ComSpec || "cmd.exe",
+      args: ["/d", "/s", "/k", "node", "scripts\\showcase-watch.js"],
+    };
+  }
+  if (platform === "darwin") {
+    const escaped = root.replaceAll("\\", "\\\\").replaceAll('"', '\\"');
+    return {
+      command: "osascript",
+      args: [
+        "-e",
+        `tell application "Terminal" to do script "cd \\\"${escaped}\\\" && node scripts/showcase-watch.js"`,
+      ],
+    };
+  }
+  return {
+    command: "x-terminal-emulator",
+    args: ["-e", "bash", "-lc", "node scripts/showcase-watch.js; exec bash"],
+  };
 }
 
 function launchDetached(specification) {
@@ -231,14 +259,14 @@ async function portResponds(port) {
   }
 }
 
-async function killProcessTree(pid, platform = process.platform) {
+async function killProcessTree(pid, platform = process.platform, detachedGroup = false) {
   if (!Number.isInteger(pid) || pid < 1) return;
   if (platform === "win32") {
     await execFileAsync("taskkill.exe", ["/pid", String(pid), "/t", "/f"], { windowsHide: true });
     return;
   }
   try {
-    process.kill(pid, "SIGTERM");
+    process.kill(detachedGroup ? -pid : pid, "SIGTERM");
   } catch (error) {
     if (error.code !== "ESRCH") throw error;
   }
@@ -266,6 +294,21 @@ export class ServiceManager {
     }
     child.startupError = null;
     child.on("error", (error) => { child.startupError = error; });
+    return child;
+  }
+
+  #spawnWatchTerminal() {
+    const specification = watchTerminalCommand(process.platform, process.env, this.root);
+    const child = spawn(specification.command, specification.args, {
+      cwd: this.root,
+      detached: true,
+      env: interactiveTerminalEnvironment(),
+      stdio: "ignore",
+      windowsHide: false,
+    });
+    child.startupError = null;
+    child.on("error", (error) => { child.startupError = error; });
+    child.unref();
     return child;
   }
 
@@ -333,7 +376,7 @@ export class ServiceManager {
       log("변경 감시는 이미 실행 중입니다.");
       return { alreadyRunning: true };
     }
-    const child = this.#spawnScript("showcase:watch");
+    const child = this.#spawnWatchTerminal();
     this.watchProcess = child;
     child.once("exit", () => {
       if (this.watchProcess === child) this.watchProcess = null;
@@ -348,7 +391,7 @@ export class ServiceManager {
       error.code = "watch-start-failed";
       throw error;
     }
-    log("변경 감시를 시작했습니다.");
+    log("별도 터미널에서 변경 감시를 시작했습니다.");
     return { alreadyRunning: false };
   }
 
@@ -357,7 +400,7 @@ export class ServiceManager {
       log("변경 감시는 이미 중지되어 있습니다.");
       return { alreadyStopped: true };
     }
-    await killProcessTree(this.watchProcess.pid);
+    await killProcessTree(this.watchProcess.pid, process.platform, true);
     this.watchProcess = null;
     log("변경 감시를 중지했습니다.");
     return { alreadyStopped: false };

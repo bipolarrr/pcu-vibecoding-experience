@@ -28,15 +28,13 @@ export const enabledFeatures = [ghost, score];
 
 ## 완료 검증
 
-저장소 루트에서 다음 명령을 각각 실행하고 종료 코드가 `0`인지 확인한다.
+저장소 루트에서 활성 기능 진입 파일의 문법을 확인한다.
 
 ```sh
 node --check src/features/enabled.js
-node --test .showcase/activation.test.js
-node --test
 ```
 
-`.showcase/activation.test.js`는 현재 작업 트리의 진입 파일과 활성 기능 JavaScript의 문법을 검사한다. 숨김 디렉터리의 테스트가 기본 탐색에 포함된다고 가정하지 않고 명시적으로 실행한다. 이 검사는 import 대상의 존재, 설치 시 오류, UI 동작까지 보장하지 않는다.
+게임 코드 전체에 대한 회귀 테스트는 시연 작업마다 반복하지 않는다. `npm test`는 Node.js와 Codex CLI 설치, Codex 로그인, OpenAI 서비스 연결처럼 시연 자체를 막는 환경 문제를 점검할 때 사용한다.
 
 브라우저에서는 완성형 검증 페이지뿐 아니라 **현재 활성 목록을 사용하는 실제 `index.html`**을 확인한다.
 

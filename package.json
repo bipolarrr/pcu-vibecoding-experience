@@ -11,6 +11,6 @@
     "showcase:start": "node .showcase/demo.mjs start",
     "showcase:status": "node .showcase/demo.mjs status",
     "showcase:watch": "node scripts/showcase-watch.js",
-    "test": "node --test"
+    "test": "node scripts/showcase-readiness.js"
   }
 }

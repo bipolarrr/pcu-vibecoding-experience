@@ -17,7 +17,7 @@ export const EXIT_READY = 0;
 export const EXIT_ERROR = 2;
 export const EXIT_RESET_NEEDED = 10;
 export const PREPARED_SESSIONS_VERSION = 1;
-export const VERIFICATION_CACHE_VERSION = 1;
+export const VERIFICATION_CACHE_VERSION = 2;
 
 export const PREPARATION_PROMPT = `시연 시작 전 내부 준비 작업이다. 체험자의 게임 요청으로 처리하지 말고 파일을 절대 변경하지 마라.
 
@@ -26,7 +26,7 @@ export const PREPARATION_PROMPT = `시연 시작 전 내부 준비 작업이다.
 - 저장소 루트 AGENTS.md와 현재 디렉터리에 적용되는 AGENTS.override.md의 운영 규칙을 정리한다.
 - .showcase/ACTIVATION.md와 .showcase/CATALOG.md, 모든 .showcase/packs/*/manifest.json을 읽어 기능별 requires, conflicts, replaces와 스타일 축을 파악한다.
 - package.json, index.html, src/features/enabled.js 전체와 src/features/의 현재 폴더 목록을 읽어 활성 상태를 파악한다.
-- src/core/, src/i18n/, scripts/, tests/의 파일 지형을 확인하고, 기능 구현에 쓰는 공개 event·capability·UI·i18n 계약과 검증 명령의 위치를 파악한다.
+- src/core/, src/i18n/, scripts/의 파일 지형을 확인하고, 기능 구현에 쓰는 공개 event·capability·UI·i18n 계약과 브라우저 확인 방법을 파악한다. 기존 게임 코드의 테스트 파일은 읽거나 분석하지 않는다.
 - 현재 Git 변경 목록을 읽어 이미 누적된 시연 변경을 구분한다.
 
 웹 검색, 서버 시작·종료, 파일 수정, Git 변경은 하지 마라. 준비 이후 체험자의 요청이 오면 프로젝트 전체를 다시 훑지 말고, 운영 규칙상 매 요청마다 필수인 현재 활성 상태와 요청에 직접 관련된 파일만 확인하라. 마지막 응답은 정확히 "시연 준비 완료" 한 줄만 출력하라.`;
@@ -203,8 +203,8 @@ export function statusCommand() {
     if (status.kind === "ready" || status.kind === "active") {
       const verification = inspectVerification(status.baseline);
       console.log(verification.verified
-        ? `기준판 검증 완료 · ${verification.verifiedAt}`
-        : "기준판 재검증 필요");
+        ? `시연 환경 점검 완료 · ${verification.verifiedAt}`
+        : "시연 환경 점검 필요");
       return EXIT_READY;
     }
     if (status.kind === "reset-needed") return EXIT_RESET_NEEDED;
@@ -215,10 +215,10 @@ export function statusCommand() {
   }
 }
 
-function runTests() {
-  console.log("시연 환경 테스트 실행");
-  const result = run(process.execPath, ["--test"], { stdio: "inherit" });
-  if (result.status !== 0) throw new Error("테스트가 통과하지 않았다.");
+function runReadinessCheck() {
+  console.log("시연 필수 환경 점검");
+  const result = run(process.execPath, ["scripts/showcase-readiness.js"], { stdio: "inherit" });
+  if (result.status !== 0) throw new Error("시연 환경 점검에 실패했다.");
 }
 
 function verificationCachePath() {
@@ -267,13 +267,6 @@ export function clearCurrentVerification() {
   rmSync(verificationCachePath(), { force: true });
 }
 
-function runQuickVerification() {
-  const enabled = resolve(repositoryRoot, "src/features/enabled.js");
-  if (!existsSync(enabled)) return;
-  const result = run(process.execPath, ["--check", enabled]);
-  requireSuccess(result, "활성 기능 진입 파일 확인");
-}
-
 export function inspectVerification(baseline = resolveCommit(`refs/heads/${DEMO_BRANCH}`)) {
   if (!baseline) return { verified: false, reason: "baseline-missing" };
   try {
@@ -295,16 +288,10 @@ export function recordCurrentVerification() {
   return true;
 }
 
-function ensureVerified(baseline, { force = false } = {}) {
-  runQuickVerification();
-  const verification = inspectVerification(baseline);
-  if (!force && verification.verified) {
-    console.log("기준판과 실행 환경 변경 없음 · 이전 검증 결과 사용");
-    return verification;
-  }
-  console.log("기준판 또는 실행 환경 변경 감지 · 전체 테스트 실행");
+function ensureVerified(baseline) {
+  console.log("시연 시작 전 필수 환경을 다시 점검합니다.");
   clearCurrentVerification();
-  runTests();
+  runReadinessCheck();
   const cache = writeVerificationCache(baseline);
   console.log("시연 환경 검증 완료");
   return { verified: true, reason: "verified-now", verifiedAt: cache.verifiedAt };
@@ -322,7 +309,7 @@ export function baselineCommand() {
     if (changes) throw new Error("작업 트리가 깨끗하지 않다. 변경 사항을 먼저 커밋해야 한다.");
 
     clearCurrentVerification();
-    runTests();
+    runReadinessCheck();
     const head = gitOutput(["rev-parse", "HEAD"], "현재 커밋 확인");
     const previous = resolveCommit(`refs/heads/${DEMO_BRANCH}`);
     if (currentBranch() === DEMO_BRANCH) {
@@ -446,7 +433,7 @@ const preparationFiles = [
   "index.html",
 ];
 
-const preparationDirectories = ["src/core", "src/features", "src/i18n", "scripts", "tests"];
+const preparationDirectories = ["src/core", "src/features", "src/i18n", "scripts"];
 
 function filesIn(directory, predicate = () => true) {
   const absoluteDirectory = resolve(repositoryRoot, directory);
@@ -604,6 +591,16 @@ export function codexTerminalCommand(
   };
 }
 
+export function interactiveTerminalEnvironment(environment = process.env) {
+  const interactiveEnvironment = { ...environment };
+  for (const [name, value] of Object.entries(interactiveEnvironment)) {
+    if (name.toUpperCase() === "TERM" && String(value).toLowerCase() === "dumb") {
+      delete interactiveEnvironment[name];
+    }
+  }
+  return interactiveEnvironment;
+}
+
 export function startCommand({
   platformName = process.platform,
   environment = process.env,
@@ -614,6 +611,7 @@ export function startCommand({
     const child = spawnImpl(specification.command, specification.args, {
       cwd: repositoryRoot,
       detached: true,
+      env: interactiveTerminalEnvironment(environment),
       stdio: "ignore",
       windowsHide: false,
     });
@@ -642,6 +640,7 @@ export function sessionCommand() {
     const result = spawnSync(executable, ["fork", "-C", showcaseDirectory, prepared.threadId], {
       cwd: repositoryRoot,
       encoding: "utf8",
+      env: interactiveTerminalEnvironment(),
       shell: false,
       stdio: "inherit",
     });

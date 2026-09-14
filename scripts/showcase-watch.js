@@ -254,6 +254,7 @@ async function main() {
   const sourceRoot = join(projectRoot, "src");
   const observer = createObserver({ rootDir: sourceRoot, baseDir: projectRoot });
   await observer.start();
+  process.stdout.write("\u001b]0;LIVE CODE · Tetris\u0007");
   process.stdout.write(`${ANSI.cyan}◆ LIVE CODE${ANSI.reset}  ${ANSI.dim}watching src/ for real workspace changes…${ANSI.reset}\n`);
 
   const stop = async () => {

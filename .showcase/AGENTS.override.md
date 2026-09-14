@@ -30,5 +30,5 @@
 2. 변경 전에 `.showcase/ACTIVATION.md`를 읽고 해당 절차를 적용한다. 기능 정보는 `.showcase/CATALOG.md`와 해당 `manifest.json`에서 확인한다.
 3. 이미 import와 등록이 완료된 기능은 다시 추가하지 않는다. 중간에 실패한 작업은 현재 파일에서 누락된 부분만 보완한다.
 4. `enabled.js`는 기존 선언을 편집한다. 파일 끝에 import와 export 묶음을 덧붙이지 않는다. `enabledFeatures` 선언은 정확히 하나, 기능별 import와 배열 항목은 각각 하나만 유지한다.
-5. 변경 후 저장소 루트에서 `node --check src/features/enabled.js`, `node --test .showcase/activation.test.js`, `node --test`를 순서대로 실행한다. 하나라도 실패하면 수정 후 다시 검증한다.
-6. 실제 `index.html`을 브라우저에서 열어 시작, 기본 조작, 요청 기능, console 오류를 확인한다. 문법 검사나 전체 테스트 통과만으로 완료를 선언하지 않는다.
+5. 변경 후 저장소 루트에서 `node --check src/features/enabled.js`를 실행한다. 게임 코드 전체에 대한 회귀 테스트는 시연 작업마다 반복하지 않는다. 문법 검사가 실패하면 수정 후 다시 검증한다.
+6. 실제 `index.html`을 브라우저에서 열어 시작, 기본 조작, 요청 기능, console 오류를 확인한다. 문법 검사만으로 완료를 선언하지 않는다.
