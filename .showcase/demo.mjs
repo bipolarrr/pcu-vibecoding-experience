@@ -563,11 +563,6 @@ export function codexTerminalCommand(
       args: [
         "/d",
         "/s",
-        "/c",
-        "start",
-        "",
-        "cmd.exe",
-        "/d",
         "/k",
         "node",
         ".showcase\\demo.mjs",

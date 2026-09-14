@@ -1,0 +1,1 @@
+{"id":"align-x-left","requires":["alignment-frame"],"conflicts":["align-x-center","align-x-right"],"replaces":["align-x-center","align-x-right"],"uiSlots":[]}

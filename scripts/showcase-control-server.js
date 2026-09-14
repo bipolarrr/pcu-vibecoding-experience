@@ -10,6 +10,7 @@ import { promisify } from "node:util";
 
 import {
   clearCurrentVerification,
+  codexTerminalCommand,
   interactiveTerminalEnvironment,
   inspectShowcase,
   inspectVerification,
@@ -22,6 +23,7 @@ const scriptPath = fileURLToPath(import.meta.url);
 export const projectRoot = resolve(dirname(scriptPath), "..");
 export const DEFAULT_CONTROL_PORT = 5174;
 export const DEFAULT_GAME_PORT = 5173;
+const CONTROL_SHUTDOWN_TIMEOUT = 5 * 60_000;
 
 const delay = (milliseconds) => new Promise((accept) => setTimeout(accept, milliseconds));
 const now = () => new Date().toLocaleTimeString("ko-KR", { hour12: false });
@@ -277,6 +279,7 @@ export class ServiceManager {
     this.root = root;
     this.gamePort = gamePort;
     this.watchProcess = null;
+    this.codexProcess = null;
     this.gameProcess = null;
   }
 
@@ -299,6 +302,21 @@ export class ServiceManager {
 
   #spawnWatchTerminal() {
     const specification = watchTerminalCommand(process.platform, process.env, this.root);
+    const child = spawn(specification.command, specification.args, {
+      cwd: this.root,
+      detached: true,
+      env: interactiveTerminalEnvironment(),
+      stdio: "ignore",
+      windowsHide: false,
+    });
+    child.startupError = null;
+    child.on("error", (error) => { child.startupError = error; });
+    child.unref();
+    return child;
+  }
+
+  #spawnCodexTerminal() {
+    const specification = codexTerminalCommand(process.platform, process.env);
     const child = spawn(specification.command, specification.args, {
       cwd: this.root,
       detached: true,
@@ -406,6 +424,51 @@ export class ServiceManager {
     return { alreadyStopped: false };
   }
 
+  async startCodex() {
+    if (this.codexProcess?.exitCode === null) {
+      log("인공지능 도우미는 이미 실행 중입니다.");
+      return { alreadyRunning: true };
+    }
+    const child = this.#spawnCodexTerminal();
+    this.codexProcess = child;
+    child.once("exit", () => {
+      if (this.codexProcess === child) this.codexProcess = null;
+    });
+    await Promise.race([
+      new Promise((accept) => child.once("spawn", accept)),
+      new Promise((_, reject) => child.once("error", reject)),
+    ]);
+    await delay(150);
+    if (child.exitCode !== null) {
+      const error = new Error("codex process exited");
+      error.code = "codex-failed";
+      throw error;
+    }
+    log("새 명령 창에서 인공지능 도우미를 열었습니다.");
+    return { alreadyRunning: false };
+  }
+
+  async stopCodex() {
+    if (!this.codexProcess || this.codexProcess.exitCode !== null) {
+      log("인공지능 도우미는 이미 중지되어 있습니다.");
+      return { alreadyStopped: true };
+    }
+    await killProcessTree(this.codexProcess.pid, process.platform, true);
+    this.codexProcess = null;
+    log("인공지능 도우미를 중지했습니다.");
+    return { alreadyStopped: false };
+  }
+
+  async stopAll() {
+    const results = await Promise.allSettled([
+      this.stopCodex(),
+      this.stopWatch(),
+      this.stopGame(),
+    ]);
+    const failure = results.find((result) => result.status === "rejected");
+    if (failure) throw failure.reason;
+  }
+
   async status() {
     const health = await gameHealth(this.gamePort);
     return {
@@ -452,7 +515,7 @@ export function createActionExecutor({ root = projectRoot, services = new Servic
     if (action === "watch-stop") return { ...(await services.stopWatch()), code: "watch-stopped" };
     if (action === "showcase-start") {
       log("인공지능 도우미를 새 명령 창에서 엽니다.");
-      await runNpmScript("showcase:start", { root });
+      await services.startCodex();
       return { code: "codex-launched" };
     }
     if (action === "fresh-start") {
@@ -468,7 +531,7 @@ export function createActionExecutor({ root = projectRoot, services = new Servic
       log("5/6 인공지능 도우미가 프로젝트를 미리 파악합니다.");
       await runNpmScript("showcase:prepare", { root });
       log("6/6 인공지능 도우미를 새 명령 창에서 엽니다.");
-      await runNpmScript("showcase:start", { root });
+      await services.startCodex();
       return { code: "fresh-started" };
     }
 
@@ -498,11 +561,75 @@ export async function startControlServer({
   token = randomBytes(24).toString("base64url"),
   services = new ServiceManager({ root }),
   execute = null,
+  instanceId = randomBytes(16).toString("base64url"),
 } = {}) {
   const canonicalRoot = await realpath(root);
   const actionExecutor = execute ?? createActionExecutor({ root: canonicalRoot, services });
   let activeJob = null;
+  let activeJobPromise = null;
   let lastResult = null;
+  let shuttingDown = false;
+  let shutdownPromise = null;
+
+  const runAction = async (action) => {
+    if (shuttingDown) {
+      const error = new Error("control server is shutting down");
+      error.code = "control-unavailable";
+      throw error;
+    }
+    if (activeJob) {
+      const error = new Error("another job is running");
+      error.code = "job-running";
+      error.activeJob = activeJob;
+      throw error;
+    }
+    activeJob = action;
+    const label = ACTION_LABELS.get(action) ?? action;
+    const startedAt = Date.now();
+    log(`▶ 작업 시작: ${label}`);
+    activeJobPromise = (async () => {
+      try {
+        const result = await actionExecutor(action);
+        lastResult = { ok: true, action, code: result.code, finishedAt: new Date().toISOString() };
+        log(`✓ 작업 완료: ${label} (${((Date.now() - startedAt) / 1000).toFixed(1)}초)`);
+        return lastResult;
+      } catch (error) {
+        const code = typeof error.code === "string" ? error.code : classifyCommandFailure(error);
+        console.error(`[${now()}] ✗ 작업 실패: ${label} · ${code}`);
+        const detail = error.cause ?? error;
+        if (detail.stdout || detail.stderr) console.error(String(detail.stderr || detail.stdout).trim());
+        else console.error(detail.message ?? String(detail));
+        lastResult = { ok: false, action, code, finishedAt: new Date().toISOString() };
+        throw Object.assign(error, { result: lastResult });
+      } finally {
+        activeJob = null;
+        activeJobPromise = null;
+      }
+    })();
+    return activeJobPromise;
+  };
+
+  const closeServer = () => new Promise((accept, reject) => {
+    server.close((error) => error ? reject(error) : accept());
+    server.closeAllConnections();
+  });
+
+  const shutdown = ({ stopAll = true } = {}) => {
+    if (shutdownPromise) return shutdownPromise;
+    shuttingDown = true;
+    shutdownPromise = (async () => {
+      if (activeJobPromise) {
+        try { await activeJobPromise; } catch { /* The result was already logged. */ }
+      }
+      try {
+        if (stopAll) await services.stopAll();
+        else await services.stopWatch();
+      } finally {
+        await closeServer();
+      }
+    })();
+    return shutdownPromise;
+  };
 
   const server = createServer(async (request, response) => {
     response.setHeader("X-Content-Type-Options", "nosniff");
@@ -521,17 +648,30 @@ export async function startControlServer({
     }
 
     if (request.method === "GET" && url.pathname === "/api/session") {
-      json(response, 200, { ok: true, token });
+      json(response, 200, { ok: true, token, root: canonicalRoot, pid: process.pid, instanceId });
       return;
     }
     if (request.method === "GET" && url.pathname === "/api/status") {
       json(response, 200, {
         ok: true,
+        instanceId,
         showcase: safeStatus(),
         services: await services.status(),
         activeJob,
         lastResult,
       });
+      return;
+    }
+    if (request.method === "POST" && url.pathname === "/api/shutdown") {
+      const expectedOrigin = `http://${request.headers.host}`;
+      if (request.headers.origin !== expectedOrigin || request.headers["x-showcase-token"] !== token) {
+        json(response, 403, { ok: false, code: "request-denied" });
+        return;
+      }
+      json(response, 202, { ok: true, code: "shutdown-started", instanceId });
+      setImmediate(() => shutdown().catch((error) => {
+        console.error(`[${now()}] 운영 서버 종료 실패: ${error.message}`);
+      }));
       return;
     }
     if (request.method === "POST" && url.pathname.startsWith("/api/actions/")) {
@@ -540,7 +680,7 @@ export async function startControlServer({
         json(response, 403, { ok: false, code: "request-denied" });
         return;
       }
-      if (activeJob) {
+      if (activeJob || shuttingDown) {
         json(response, 409, { ok: false, code: "job-running", activeJob });
         return;
       }
@@ -551,28 +691,11 @@ export async function startControlServer({
         json(response, 400, { ok: false, code: "invalid-request" });
         return;
       }
-      activeJob = action;
-      const label = ACTION_LABELS.get(action) ?? action;
-      const startedAt = Date.now();
-      log(`▶ 작업 시작: ${label}`);
       try {
-        const result = await actionExecutor(action);
-        lastResult = { ok: true, action, code: result.code, finishedAt: new Date().toISOString() };
-        log(`✓ 작업 완료: ${label} (${((Date.now() - startedAt) / 1000).toFixed(1)}초)`);
-        json(response, 200, lastResult);
+        json(response, 200, await runAction(action));
       } catch (error) {
-        const code = typeof error.code === "string" ? error.code : classifyCommandFailure(error);
-        console.error(`[${now()}] ✗ 작업 실패: ${label} · ${code}`);
-        const detail = error.cause ?? error;
-        if (detail.stdout || detail.stderr) {
-          console.error(String(detail.stderr || detail.stdout).trim());
-        } else {
-          console.error(detail.message ?? String(detail));
-        }
-        lastResult = { ok: false, action, code, finishedAt: new Date().toISOString() };
-        json(response, code === "unknown-action" ? 404 : 500, lastResult);
-      } finally {
-        activeJob = null;
+        const result = error.result ?? { ok: false, action, code: error.code ?? "command-failed" };
+        json(response, result.code === "unknown-action" ? 404 : 500, result);
       }
       return;
     }
@@ -608,7 +731,48 @@ export async function startControlServer({
       accept();
     });
   });
-  return { server, services, token };
+  return { server, services, token, instanceId, runAction, shutdown };
+}
+
+export async function replaceExistingControl({ root = projectRoot, port = DEFAULT_CONTROL_PORT } = {}) {
+  const canonicalRoot = await realpath(root);
+  const origin = `http://127.0.0.1:${port}`;
+  let session;
+  try {
+    const response = await fetch(`${origin}/api/session`, { signal: AbortSignal.timeout(700) });
+    if (!response.ok) return false;
+    session = await response.json();
+  } catch {
+    return false;
+  }
+  if (resolve(session.root ?? "") !== canonicalRoot || typeof session.token !== "string") {
+    const error = new Error("control port belongs to another process");
+    error.code = "EADDRINUSE";
+    throw error;
+  }
+  log("기존 시연 운영 서버를 종료하고 전체 시연을 다시 시작합니다.");
+  const response = await fetch(`${origin}/api/shutdown`, {
+    method: "POST",
+    headers: { Origin: origin, "X-Showcase-Token": session.token },
+    signal: AbortSignal.timeout(2_000),
+  });
+  if (!response.ok) {
+    const error = new Error("existing control server refused shutdown");
+    error.code = "EADDRINUSE";
+    throw error;
+  }
+  const deadline = Date.now() + CONTROL_SHUTDOWN_TIMEOUT;
+  while (Date.now() < deadline) {
+    await delay(100);
+    try {
+      await fetch(`${origin}/api/session`, { signal: AbortSignal.timeout(500) });
+    } catch {
+      return true;
+    }
+  }
+  const error = new Error("existing control server did not stop in time");
+  error.code = "ETIMEDOUT";
+  throw error;
 }
 
 async function main() {
@@ -621,7 +785,14 @@ async function main() {
   if (!allowed || !Number.isInteger(port) || port < 1 || port > 65535) {
     throw new Error("사용법: npm run showcase:control -- [--port 5174] [--no-open]");
   }
+  const replacedExisting = await replaceExistingControl({ port });
   const app = await startControlServer({ port });
+  const stop = async () => {
+    await app.shutdown({ stopAll: false });
+    process.exit(0);
+  };
+  process.once("SIGINT", stop);
+  process.once("SIGTERM", stop);
   const url = `http://127.0.0.1:${app.server.address().port}/`;
   console.log("");
   console.log("시연 운영 서버가 시작되었습니다.");
@@ -631,12 +802,13 @@ async function main() {
   console.log("이 창을 닫으면 운영 페이지도 종료됩니다. 종료: Ctrl+C");
   console.log("");
   if (!args.includes("--no-open")) await launchDetached(browserCommand(url));
-  const stop = async () => {
-    await app.services.stopWatch();
-    app.server.close(() => process.exit(0));
-  };
-  process.once("SIGINT", stop);
-  process.once("SIGTERM", stop);
+  if (replacedExisting) {
+    try {
+      await app.runAction("fresh-start");
+    } catch {
+      console.error("전체 시연 재시작을 완료하지 못했습니다. 운영 페이지에서 상태를 확인해 주세요.");
+    }
+  }
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {

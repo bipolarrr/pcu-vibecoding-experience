@@ -8,6 +8,7 @@ const i18n = createI18n({
 const result = document.querySelector("#result");
 const actionButtons = [...document.querySelectorAll("[data-action]")];
 let token = null;
+let instanceId = null;
 let busy = false;
 let armedButton = null;
 let armedTimer = null;
@@ -35,6 +36,7 @@ async function refresh() {
   try {
     const response = await fetch("/api/status", { cache: "no-store" });
     const body = await response.json();
+    if (instanceId && body.instanceId !== instanceId) await acquireSession();
     statusText("git", body.showcase.kind);
     statusText("verification", body.showcase.verification.verified ? "verified" : "verification-needed");
     statusText("game", body.services.game ? "running" : "stopped");
@@ -47,6 +49,13 @@ async function refresh() {
     statusText("watch", "unavailable");
     showResult("control-unavailable", false);
   }
+}
+
+async function acquireSession() {
+  const response = await fetch("/api/session", { cache: "no-store" });
+  const session = await response.json();
+  token = session.token;
+  instanceId = session.instanceId;
 }
 
 function setBusy(value) {
@@ -67,10 +76,17 @@ async function execute(action) {
   setBusy(true);
   showResult("working");
   try {
-    const response = await fetch(`/api/actions/${encodeURIComponent(action)}`, {
+    let response = await fetch(`/api/actions/${encodeURIComponent(action)}`, {
       method: "POST",
       headers: { "X-Showcase-Token": token },
     });
+    if (response.status === 403) {
+      await acquireSession();
+      response = await fetch(`/api/actions/${encodeURIComponent(action)}`, {
+        method: "POST",
+        headers: { "X-Showcase-Token": token },
+      });
+    }
     const body = await response.json();
     showResult(body.code, body.ok);
   } catch {
@@ -108,8 +124,7 @@ i18n.onChange(() => {
 });
 
 try {
-  const response = await fetch("/api/session", { cache: "no-store" });
-  token = (await response.json()).token;
+  await acquireSession();
   await refresh();
   setInterval(refresh, 2500);
 } catch {

@@ -1,0 +1,19 @@
+body {
+  display: grid;
+  grid-template-columns: minmax(min-content, 1fr);
+  grid-template-rows: minmax(min-content, 1fr);
+  min-height: 100vh;
+  overflow: auto;
+}
+
+#game-shell {
+  grid-area: 1 / 1;
+  justify-self: var(--game-shell-inline-alignment, start);
+  align-self: var(--game-shell-block-alignment, start);
+}
+
+#baseline-status {
+  position: fixed;
+  left: 12px;
+  bottom: 8px;
+}

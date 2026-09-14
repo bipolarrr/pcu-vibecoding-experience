@@ -1,0 +1,1 @@
+{"id":"align-y-center","requires":["alignment-frame"],"conflicts":["align-y-top","align-y-bottom"],"replaces":["align-y-top","align-y-bottom"],"uiSlots":[]}
