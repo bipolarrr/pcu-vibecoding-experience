@@ -38,12 +38,4 @@ node --check src/features/enabled.js
 
 문법 검사가 통과하면 요청 기능이 정상 적용된 것으로 간주한다. 시연 세션에서 에이전트는 브라우저나 게임 화면을 열거나 보지 않으며, 새로고침·스크린샷·console·DOM·실제 조작을 통한 확인과 지속적인 모니터링을 하지 않는다.
 
-## 점수 활성화 오류 분석
-
-복구 직전 `enabled.js`에는 `import score`와 `export const enabledFeatures = [score]`가 각각 두 번 존재하였다. `node --check`에서 `SyntaxError: Identifier 'score' has already been declared`를 확인하였다. 같은 모듈의 중복 선언으로 구문 분석이 실패하여 `src/main.js`의 게임 초기화가 실행되지 않은 것이 직접 원인이다.
-
-기존 `tests/catalog.test.js`의 기준 상태 검사는 `git show HEAD:src/features/enabled.js`를 확인한다. 현재 작업 트리의 활성 목록을 파싱하지 않으므로 이번 문법 오류를 검출하는 검사로 사용할 수 없다. 이에 현재 파일의 문법 검사를 별도 필수 단계로 추가하였다.
-
-당시 모델의 편집 명령 및 검증 실행 기록은 이 분석에서 확인하지 않았다. 중복 선언이라는 결과는 확인되었으나 append 사용, 재시도 과정, 검증 생략 여부 및 모델 내부 판단은 단정하지 않는다.
-
 EOD
