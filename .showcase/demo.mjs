@@ -26,7 +26,7 @@ export const PREPARATION_PROMPT = `시연 시작 전 내부 준비 작업이다.
 - 저장소 루트 AGENTS.md와 현재 디렉터리에 적용되는 AGENTS.override.md의 운영 규칙을 정리한다.
 - .showcase/ACTIVATION.md와 .showcase/CATALOG.md, 모든 .showcase/packs/*/manifest.json을 읽어 기능별 requires, conflicts, replaces와 스타일 축을 파악한다.
 - package.json, index.html, src/features/enabled.js 전체와 src/features/의 현재 폴더 목록을 읽어 활성 상태를 파악한다.
-- src/core/, src/i18n/, scripts/의 파일 지형을 확인하고, 기능 구현에 쓰는 공개 event·capability·UI·i18n 계약과 브라우저 확인 방법을 파악한다. 기존 게임 코드의 테스트 파일은 읽거나 분석하지 않는다.
+- src/core/, src/i18n/, scripts/의 파일 지형을 확인하고, 기능 구현에 쓰는 공개 event·capability·UI·i18n 계약을 파악한다. 기존 게임 코드의 테스트 파일은 읽거나 분석하지 않는다.
 - 현재 Git 변경 목록을 읽어 이미 누적된 시연 변경을 구분한다.
 
 웹 검색, 서버 시작·종료, 파일 수정, Git 변경은 하지 마라. 준비 이후 체험자의 요청이 오면 프로젝트 전체를 다시 훑지 말고, 운영 규칙상 매 요청마다 필수인 현재 활성 상태와 요청에 직접 관련된 파일만 확인하라. 마지막 응답은 정확히 "시연 준비 완료" 한 줄만 출력하라.`;
