@@ -6,12 +6,20 @@ const i18n = createI18n({
   document: window.document,
 });
 const result = document.querySelector("#result");
+const progress = document.querySelector("#progress");
+const progressStage = document.querySelector("#progress-stage");
+const progressSteps = document.querySelector("#progress-steps");
+const stageItems = [...progressSteps.querySelectorAll("[data-stage]")];
+const freshStages = stageItems.map((item) => item.dataset.stage);
 const actionButtons = [...document.querySelectorAll("[data-action]")];
 let token = null;
 let instanceId = null;
 let busy = false;
 let armedButton = null;
 let armedTimer = null;
+let observedJob = false;
+let progressAction = null;
+let progressPhase = null;
 
 const translateResult = (code) => {
   try {
@@ -32,6 +40,26 @@ function statusText(prefix, value) {
   node.dataset.state = value;
 }
 
+function showProgress(action, stage = "working") {
+  progressAction = action;
+  progressPhase = stage;
+  progress.hidden = false;
+  const fresh = action === "fresh-start";
+  progressSteps.hidden = !fresh;
+  const stageKey = fresh && freshStages.includes(stage) ? stage : "working";
+  progressStage.textContent = i18n.t(`control.progress.${stageKey}`);
+  const current = freshStages.indexOf(stage);
+  for (const [index, item] of stageItems.entries()) {
+    item.dataset.state = index < current ? "complete" : index === current ? "current" : "pending";
+  }
+}
+
+function hideProgress() {
+  progress.hidden = true;
+  progressAction = null;
+  progressPhase = null;
+}
+
 async function refresh() {
   try {
     const response = await fetch("/api/status", { cache: "no-store" });
@@ -41,12 +69,20 @@ async function refresh() {
     statusText("verification", body.showcase.verification.verified ? "verified" : "verification-needed");
     statusText("game", body.services.game ? "running" : "stopped");
     statusText("watch", body.services.watch ? "running" : "stopped");
-    if (body.activeJob && !busy) showResult("job-running", false);
+    if (body.activeJob) {
+      observedJob = true;
+      showProgress(body.activeJob, body.activeStage ?? "working");
+    } else if (!busy) {
+      hideProgress();
+      if (observedJob && body.lastResult) showResult(body.lastResult.code, body.lastResult.ok);
+      observedJob = false;
+    }
   } catch {
     statusText("git", "unavailable");
     statusText("verification", "unavailable");
     statusText("game", "unavailable");
     statusText("watch", "unavailable");
+    if (!busy) hideProgress();
     showResult("control-unavailable", false);
   }
 }
@@ -74,6 +110,7 @@ function disarm() {
 
 async function execute(action) {
   setBusy(true);
+  showProgress(action, action === "fresh-start" ? "reset" : "working");
   showResult("working");
   try {
     let response = await fetch(`/api/actions/${encodeURIComponent(action)}`, {
@@ -94,6 +131,7 @@ async function execute(action) {
   } finally {
     setBusy(false);
     await refresh();
+    hideProgress();
   }
 }
 
@@ -120,6 +158,7 @@ for (const button of actionButtons) {
 
 i18n.onChange(() => {
   disarm();
+  if (progressAction) showProgress(progressAction, progressPhase);
   refresh();
 });
 

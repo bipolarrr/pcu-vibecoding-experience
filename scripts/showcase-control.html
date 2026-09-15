@@ -45,6 +45,25 @@
         <button class="primary" type="button" data-action="fresh-start" data-i18n="control.freshButton"></button>
       </section>
 
+      <section id="progress" class="progress-card" role="status" aria-live="polite" hidden>
+        <div class="progress-heading">
+          <span class="progress-spinner" aria-hidden="true"></span>
+          <div>
+            <h2 data-i18n="control.progress.title"></h2>
+            <p id="progress-stage" data-i18n="control.progress.working"></p>
+          </div>
+        </div>
+        <div class="progress-track" aria-hidden="true"><span></span></div>
+        <ol id="progress-steps" class="progress-steps" hidden>
+          <li data-stage="reset" data-i18n="control.progress.step.reset"></li>
+          <li data-stage="prepare" data-i18n="control.progress.step.prepare"></li>
+          <li data-stage="game" data-i18n="control.progress.step.game"></li>
+          <li data-stage="codex" data-i18n="control.progress.step.codex"></li>
+          <li data-stage="watch" data-i18n="control.progress.step.watch"></li>
+          <li data-stage="display" data-i18n="control.progress.step.display"></li>
+        </ol>
+      </section>
+
       <p id="result" class="result" role="status" aria-live="polite"></p>
 
       <section class="commands">

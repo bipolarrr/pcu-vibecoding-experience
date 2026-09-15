@@ -65,7 +65,7 @@ button:disabled { cursor: wait; opacity: 0.55; }
   margin: 32px 0 18px;
 }
 
-.status-card, .command-group, .launch-card {
+.status-card, .command-group, .launch-card, .progress-card {
   border: 1px solid #252b3d;
   background: rgb(19 23 34 / 88%);
   box-shadow: 0 20px 60px rgb(0 0 0 / 18%);
@@ -80,6 +80,58 @@ button:disabled { cursor: wait; opacity: 0.55; }
 .launch-card p { margin-bottom: 0; color: #a9afc3; }
 .primary { min-width: 210px; padding: 16px 22px; border-color: #4ade80; background: #36c76d; color: #07130b; font-weight: 900; }
 .primary:hover:not(:disabled) { background: #62dd8e; }
+
+.progress-card {
+  margin-top: 18px;
+  padding: 24px;
+  border-color: #3d7655;
+  border-radius: 20px;
+}
+.progress-card[hidden], .progress-steps[hidden] { display: none; }
+.progress-heading { display: flex; align-items: center; gap: 16px; }
+.progress-heading h2 { margin-bottom: 4px; font-size: 1.1rem; }
+.progress-heading p { margin-bottom: 0; color: #a9afc3; }
+.progress-spinner {
+  flex: 0 0 32px;
+  width: 32px;
+  height: 32px;
+  border: 3px solid #294c3a;
+  border-top-color: #86efac;
+  border-radius: 50%;
+  animation: progress-spin 900ms linear infinite;
+}
+.progress-track {
+  height: 5px;
+  margin-top: 20px;
+  overflow: hidden;
+  border-radius: 99px;
+  background: #283349;
+}
+.progress-track span {
+  display: block;
+  width: 32%;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #4ade80, #86efac);
+  animation: progress-slide 1.8s ease-in-out infinite alternate;
+}
+.progress-steps {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px 18px;
+  margin: 22px 0 0;
+  padding-left: 22px;
+  color: #8991a8;
+  font-size: 0.88rem;
+}
+.progress-steps li[data-state="complete"] { color: #86efac; }
+.progress-steps li[data-state="current"] { color: #f4f6ff; font-weight: 750; }
+@keyframes progress-spin { to { transform: rotate(360deg); } }
+@keyframes progress-slide { to { transform: translateX(210%); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .progress-spinner, .progress-track span { animation: none; }
+}
 
 .result { min-height: 28px; margin: 18px 4px 28px; color: #c7cce0; }
 .result.error { color: #fca5a5; }
@@ -102,4 +154,5 @@ button.armed { border-color: #fb7185; background: #4b2029; }
 @media (max-width: 500px) {
   .shell { width: min(100% - 20px, 1100px); padding-top: 24px; }
   .status-grid, .command-grid { grid-template-columns: 1fr; }
+  .progress-steps { grid-template-columns: 1fr; }
 }

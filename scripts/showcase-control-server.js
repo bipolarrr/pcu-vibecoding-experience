@@ -507,7 +507,7 @@ function json(response, status, body) {
 }
 
 export function createActionExecutor({ root = projectRoot, services = new ServiceManager({ root }) } = {}) {
-  return async function execute(action) {
+  return async function execute(action, updateStage = () => {}) {
     if (action === "dev-start") return { ...(await services.startGame()), code: "game-started" };
     if (action === "dev-restart") return { ...(await services.restartGame()), code: "game-restarted" };
     if (action === "dev-stop") return { ...(await services.stopGame()), code: "game-stopped" };
@@ -519,19 +519,25 @@ export function createActionExecutor({ root = projectRoot, services = new Servic
       return { code: "codex-launched" };
     }
     if (action === "fresh-start") {
+      updateStage("reset");
       log("1/6 이전 시연을 정리하고 기준판으로 되돌립니다.");
       if (await controlIsInBaseline(root)) await runNpmScript("showcase:reset", { root });
       else await resetFeaturesDuringDevelopment(root);
-      log("2/6 게임 서버를 준비합니다.");
-      await services.startGame();
-      log("3/6 게임 화면을 브라우저에서 엽니다.");
-      await launchDetached(browserCommand(`http://127.0.0.1:${services.gamePort}/`));
-      log("4/6 코드 변경 감시를 준비합니다.");
-      await services.startWatch();
-      log("5/6 인공지능 도우미가 프로젝트를 미리 파악합니다.");
+      updateStage("prepare");
+      log("2/6 인공지능 도우미가 프로젝트를 미리 파악합니다.");
       await runNpmScript("showcase:prepare", { root });
-      log("6/6 인공지능 도우미를 새 명령 창에서 엽니다.");
+      updateStage("game");
+      log("3/6 게임 서버를 준비합니다.");
+      await services.startGame();
+      updateStage("codex");
+      log("4/6 인공지능 도우미를 새 명령 창에서 엽니다.");
       await services.startCodex();
+      updateStage("watch");
+      log("5/6 코드 변경 감시를 준비합니다.");
+      await services.startWatch();
+      updateStage("display");
+      log("6/6 게임 화면을 브라우저에서 엽니다.");
+      await launchDetached(browserCommand(`http://127.0.0.1:${services.gamePort}/`));
       return { code: "fresh-started" };
     }
 
@@ -566,6 +572,7 @@ export async function startControlServer({
   const canonicalRoot = await realpath(root);
   const actionExecutor = execute ?? createActionExecutor({ root: canonicalRoot, services });
   let activeJob = null;
+  let activeStage = null;
   let activeJobPromise = null;
   let lastResult = null;
   let shuttingDown = false;
@@ -584,12 +591,13 @@ export async function startControlServer({
       throw error;
     }
     activeJob = action;
+    activeStage = action === "fresh-start" ? "reset" : "working";
     const label = ACTION_LABELS.get(action) ?? action;
     const startedAt = Date.now();
     log(`▶ 작업 시작: ${label}`);
     activeJobPromise = (async () => {
       try {
-        const result = await actionExecutor(action);
+        const result = await actionExecutor(action, (stage) => { activeStage = stage; });
         lastResult = { ok: true, action, code: result.code, finishedAt: new Date().toISOString() };
         log(`✓ 작업 완료: ${label} (${((Date.now() - startedAt) / 1000).toFixed(1)}초)`);
         return lastResult;
@@ -603,6 +611,7 @@ export async function startControlServer({
         throw Object.assign(error, { result: lastResult });
       } finally {
         activeJob = null;
+        activeStage = null;
         activeJobPromise = null;
       }
     })();
@@ -658,6 +667,7 @@ export async function startControlServer({
         showcase: safeStatus(),
         services: await services.status(),
         activeJob,
+        activeStage,
         lastResult,
       });
       return;
